@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
@@ -484,7 +485,7 @@ class ReTerminalDashboardPanelView(HomeAssistantView):
 </body>
 </html>
 """
-        return self.Response(
+        return web.Response(
             body=html,
             status=200,
             content_type="text/html",

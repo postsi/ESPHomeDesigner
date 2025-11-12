@@ -24,6 +24,7 @@ import logging
 from http import HTTPStatus
 from typing import Any
 
+from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.json import json_dumps
@@ -89,7 +90,7 @@ class ReTerminalLayoutView(HomeAssistantView):
 
     # Convenience wrappers for HA's HomeAssistantView API
     def json(self, data: Any, status_code: int = HTTPStatus.OK):
-        return self.Response(
+        return web.Response(
             body=json_dumps(data),
             status=status_code,
             content_type="application/json",
@@ -131,7 +132,7 @@ class ReTerminalSnippetView(HomeAssistantView):
         return self._text(snippet, status_code=HTTPStatus.OK)
 
     def _text(self, body: str, status_code: int = HTTPStatus.OK):
-        return self.Response(
+        return web.Response(
             body=body,
             status=status_code,
             content_type="text/yaml",
@@ -218,7 +219,7 @@ class ReTerminalImportSnippetView(HomeAssistantView):
         return self._json(updated.to_dict(), status_code=HTTPStatus.OK)
 
     def _json(self, data: Any, status_code: int = HTTPStatus.OK):
-        return self.Response(
+        return web.Response(
             body=json_dumps(data),
             status=status_code,
             content_type="application/json",
@@ -300,7 +301,7 @@ class ReTerminalEntitiesView(HomeAssistantView):
         return self._json(results)
 
     def _json(self, data: Any, status_code: int = HTTPStatus.OK):
-        return self.Response(
+        return web.Response(
             body=json_dumps(data),
             status=status_code,
             content_type="application/json",
@@ -327,7 +328,7 @@ class ReTerminalTestView(HomeAssistantView):
         })
 
     def _json(self, data: Any, status_code: int = HTTPStatus.OK):
-        return self.Response(
+        return web.Response(
             body=json_dumps(data),
             status=status_code,
             content_type="application/json",
