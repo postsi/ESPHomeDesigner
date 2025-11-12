@@ -307,6 +307,33 @@ class ReTerminalEntitiesView(HomeAssistantView):
         )
 
 
+class ReTerminalTestView(HomeAssistantView):
+    """Simple test endpoint to verify HTTP views are working."""
+
+    url = f"{API_BASE_PATH}/test"
+    name = "api:reterminal_dashboard_test"
+    requires_auth = True
+    cors_allowed = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request) -> Any:  # type: ignore[override]
+        """Return test response."""
+        return self._json({
+            "status": "ok", 
+            "message": "reTerminal Dashboard API is working",
+            "user": str(getattr(request.get('hass_user'), 'name', 'unknown'))
+        })
+
+    def _json(self, data: Any, status_code: int = HTTPStatus.OK):
+        return self.Response(
+            body=json_dumps(data),
+            status=status_code,
+            content_type="application/json",
+        )
+
+
 async def async_register_http_views(hass: HomeAssistant, storage: DashboardStorage) -> None:
     """Register all HTTP views for this integration."""
 
@@ -314,8 +341,9 @@ async def async_register_http_views(hass: HomeAssistant, storage: DashboardStora
     hass.http.register_view(ReTerminalSnippetView(hass, storage))
     hass.http.register_view(ReTerminalImportSnippetView(hass, storage))
     hass.http.register_view(ReTerminalEntitiesView(hass))
+    hass.http.register_view(ReTerminalTestView(hass))
 
     _LOGGER.debug(
-        "reterminal_dashboard: HTTP API views registered at %s (layout, snippet, import_snippet, entities)",
+        "reterminal_dashboard: HTTP API views registered at %s (layout, snippet, import_snippet, entities, test)",
         API_BASE_PATH,
     )

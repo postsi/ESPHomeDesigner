@@ -51,6 +51,8 @@ class ReTerminalDashboardPanelView(HomeAssistantView):
         The HTML is an inlined, slightly adapted version of www/reterminal_dashboard_panel/editor.html
         with JS bindings to the reterminal_dashboard HTTP API.
         """
+        _LOGGER.info("Panel view accessed by user: %s", getattr(request.get('hass_user'), 'name', 'unknown'))
+        
         # IMPORTANT:
         # - No hard-coded host.
         # - Use relative paths to API_BASE_PATH so auth/session cookies work automatically.

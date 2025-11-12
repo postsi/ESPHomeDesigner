@@ -157,16 +157,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Register HTTP views (idempotent)
     await async_register_http_views(hass, storage)
+    _LOGGER.info("%s: HTTP API views registered", DOMAIN)
 
     # Register the embedded editor panel backend view
     hass.http.register_view(ReTerminalDashboardPanelView(hass))
+    _LOGGER.info("%s: Panel view registered at /reterminal-dashboard", DOMAIN)
 
     # Register services (idempotent)
     async_register_services(hass, storage)
-
-    # Register a custom panel for the sidebar
-    # Skip panel registration for now - user can access via direct URL
-    _LOGGER.info("%s: Panel registration skipped - access via /reterminal-dashboard", DOMAIN)
 
     _LOGGER.info("%s: Config entry %s setup completed", DOMAIN, entry.entry_id)
     return True
