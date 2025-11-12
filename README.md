@@ -281,19 +281,5 @@ These entities let you:
   - Keep it in version control.
   - Verify it against ESPHome validation before flashing.
 
-## Roadmap (High-Level)
 
-- Full-featured web editor panel:
-  - Drag-and-drop widgets.
-  - Entity picker integrated with HA.
-  - Live preview of generated YAML snippet.
-- Multiple profiles / devices:
-  - Support more reTerminal-like devices / resolutions.
-- Richer widget types:
-  - Icons, weather blocks, graphs, etc.
-- Safer merging:
-  - Optional split between static hardware snippet and layout/behavior snippets.
 
-## License
-
-Choose an OSI-approved license (e.g., MIT) for publication and place it as `LICENSE` in this repository.
