@@ -2,12 +2,9 @@
 
 ![Dashboard Editor Screenshot](https://raw.githubusercontent.com/koosoli/ReTerminalDesigner/main/screenshots/Screenshot1.png)
 
-
 > **⚠️ ALPHA VERSION - NOT PRODUCTION READY**
 > 
 > This project is currently in active development and shared for testing/feedback purposes. The code generator sometimes produces uncompilable YAML output - there are still bugs to crush! If you just want something that works out of the box, please wait for a stable release. If you want to help test and report issues, you're very welcome! 🙏
-
-
 
 **No more hand-coding ESPHome display lambdas! 🎉**
 
@@ -183,5 +180,5 @@ This is a passion project that's almost ready for prime time. Found a bug? Have 
 
 ## License
 
-Made with love, free and Open Source under the GPL 3.0 license. Share the love!
+Made with love ❤️ - free and Open Source under the GPL 3.0 license. Share the love!
 
