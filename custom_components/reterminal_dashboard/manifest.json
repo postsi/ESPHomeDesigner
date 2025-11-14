@@ -3,7 +3,7 @@
   "name": "reTerminal Dashboard Designer",
   "documentation": "https://github.com/koosoli/ReTerminalDesigner",
   "issue_tracker": "https://github.com/koosoli/ReTerminalDesigner/issues",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "after_dependencies": [
     "http",
     "frontend",
