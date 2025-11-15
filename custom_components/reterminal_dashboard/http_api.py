@@ -343,6 +343,101 @@ class ReTerminalTestView(HomeAssistantView):
         )
 
 
+class ReTerminalImageProxyView(HomeAssistantView):
+    """Proxy ESPHome images from /config/esphome/images/ for editor preview.
+    
+    This allows the editor to preview images that will be used on the device.
+    Only serves files from the ESPHome images directory for security.
+    """
+
+    url = f"{API_BASE_PATH}/image_proxy"
+    name = "api:reterminal_dashboard_image_proxy"
+    requires_auth = False  # Temporarily disable for testing
+    cors_allowed = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request) -> Any:  # type: ignore[override]
+        """Serve an image file from ESPHome directory."""
+        import os
+        import mimetypes
+        from pathlib import Path
+        
+        # Get the requested path from query parameter
+        path = request.rel_url.query.get("path", "")  # type: ignore[attr-defined]
+        
+        if not path:
+            return web.Response(
+                text="Missing path parameter",
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        
+        # Security: Only allow paths that start with /config/esphome/
+        if not path.startswith("/config/esphome/"):
+            _LOGGER.warning("Image proxy rejected invalid path: %s", path)
+            return web.Response(
+                text="Invalid path - must be under /config/esphome/",
+                status=HTTPStatus.FORBIDDEN,
+            )
+        
+        # Convert /config to actual Home Assistant config path
+        config_dir = self.hass.config.path()
+        # Remove /config prefix and join with actual config path
+        relative_path = path.replace("/config/", "", 1)
+        full_path = Path(config_dir) / relative_path
+        
+        # Security: Ensure the resolved path is still under config directory
+        try:
+            full_path = full_path.resolve()
+            config_dir_resolved = Path(config_dir).resolve()
+            if not str(full_path).startswith(str(config_dir_resolved)):
+                _LOGGER.warning("Image proxy rejected path escape attempt: %s", path)
+                return web.Response(
+                    text="Path escape attempt detected",
+                    status=HTTPStatus.FORBIDDEN,
+                )
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Image proxy path resolution error: %s", exc)
+            return web.Response(
+                text="Invalid path",
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        
+        # Check if file exists
+        if not full_path.is_file():
+            _LOGGER.debug("Image proxy: file not found: %s", full_path)
+            return web.Response(
+                text="File not found",
+                status=HTTPStatus.NOT_FOUND,
+            )
+        
+        # Determine content type
+        content_type, _ = mimetypes.guess_type(str(full_path))
+        if not content_type or not content_type.startswith("image/"):
+            content_type = "application/octet-stream"
+        
+        # Read and return the file
+        try:
+            with open(full_path, "rb") as f:
+                image_data = f.read()
+            
+            return web.Response(
+                body=image_data,
+                status=HTTPStatus.OK,
+                content_type=content_type,
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.error("Image proxy read error: %s", exc)
+            return web.Response(
+                text="Error reading file",
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+
 async def async_register_http_views(hass: HomeAssistant, storage: DashboardStorage) -> None:
     """Register all HTTP views for this integration."""
 
@@ -351,8 +446,9 @@ async def async_register_http_views(hass: HomeAssistant, storage: DashboardStora
     hass.http.register_view(ReTerminalImportSnippetView(hass, storage))
     hass.http.register_view(ReTerminalEntitiesView(hass))
     hass.http.register_view(ReTerminalTestView(hass))
+    hass.http.register_view(ReTerminalImageProxyView(hass))
 
     _LOGGER.debug(
-        "reterminal_dashboard: HTTP API views registered at %s (layout, snippet, import_snippet, entities, test)",
+        "reterminal_dashboard: HTTP API views registered at %s (layout, snippet, import_snippet, entities, test, image_proxy)",
         API_BASE_PATH,
     )

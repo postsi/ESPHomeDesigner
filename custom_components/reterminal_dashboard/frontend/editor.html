@@ -375,6 +375,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 10;
     }
 
     .widget-resize-handle::after {
@@ -1715,7 +1716,13 @@
           el.style.overflow = "hidden";
           
           if (path) {
-            // Try to load and display the image
+            // Try to load image via proxy
+            const filename = path.split("/").pop();
+            
+            // Clear element first
+            el.innerHTML = "";
+            
+            // Try to load image through HA proxy
             const img = document.createElement("img");
             img.style.maxWidth = "100%";
             img.style.maxHeight = "100%";
@@ -1726,11 +1733,34 @@
             }
             
             img.onerror = () => {
-              // If image fails to load, show placeholder text
-              el.innerHTML = "<div style='text-align:center;color:#888;font-size:11px;padding:8px;'>🖼️<br/>" + path.split("/").pop() + "<br/>(not available in editor)</div>";
+              // If image fails to load, show placeholder
+              el.innerHTML = "<div style='text-align:center;color:#666;font-size:11px;padding:8px;line-height:1.4;'>" +
+                "🖼️<br/><strong>" + filename + "</strong><br/>" +
+                "<span style='color:#999;font-size:9px;'>" + 
+                (invert ? "(inverted) " : "") + 
+                widget.width + "×" + widget.height + "px<br/>" +
+                "File not found or not accessible</span></div>";
             };
             
-            img.src = path;
+            img.onload = () => {
+              // Successfully loaded - show size info as overlay
+              const overlay = document.createElement("div");
+              overlay.style.position = "absolute";
+              overlay.style.bottom = "2px";
+              overlay.style.right = "2px";
+              overlay.style.background = "rgba(0,0,0,0.6)";
+              overlay.style.color = "white";
+              overlay.style.padding = "2px 4px";
+              overlay.style.fontSize = "8px";
+              overlay.style.borderRadius = "2px";
+              overlay.textContent = filename + " • " + widget.width + "×" + widget.height + "px";
+              el.style.position = "relative";
+              el.appendChild(overlay);
+            };
+            
+            // Use proxy endpoint to load image
+            const proxyUrl = "/api/reterminal_dashboard/image_proxy?path=" + encodeURIComponent(path);
+            img.src = proxyUrl;
             el.appendChild(img);
           } else {
             // No path specified - show empty placeholder
@@ -1738,7 +1768,7 @@
             placeholder.style.textAlign = "center";
             placeholder.style.color = "#aaa";
             placeholder.style.fontSize = "11px";
-            placeholder.textContent = "🖼️ Image\n(no path set)";
+            placeholder.innerHTML = "🖼️<br/>Image Widget<br/><span style='font-size:9px;color:#ccc;'>Enter path in properties →</span>";
             el.appendChild(placeholder);
           }
         } else {
@@ -1988,6 +2018,16 @@
       }
 
       if (type === "image") {
+        // Add helper text about image paths
+        const helpWrap = document.createElement("div");
+        helpWrap.className = "field";
+        helpWrap.style.fontSize = "9px";
+        helpWrap.style.color = "var(--muted)";
+        helpWrap.style.marginBottom = "8px";
+        helpWrap.innerHTML = "💡 Enter ESPHome image path, e.g.:<br/>" +
+          "<code style='background:#f0f0f0;padding:2px 4px;border-radius:2px;'>/config/esphome/images/photo.jpg</code>";
+        panel.appendChild(helpWrap);
+        
         addLabeledInput("Image path", "text", widget.props.path || "", (v) => {
           widget.props.path = v;
           renderCanvas();
@@ -2009,6 +2049,43 @@
         invertWrap.appendChild(invertLbl);
         invertWrap.appendChild(invertCb);
         panel.appendChild(invertWrap);
+        
+        // Fill screen toggle
+        const fillWrap = document.createElement("div");
+        fillWrap.className = "field";
+        fillWrap.style.marginTop = "12px";
+        
+        const isFullScreen = (widget.x === 0 && widget.y === 0 && 
+                             widget.width === CANVAS_WIDTH && 
+                             widget.height === CANVAS_HEIGHT);
+        
+        const fillBtn = document.createElement("button");
+        fillBtn.className = "btn " + (isFullScreen ? "btn-primary" : "btn-secondary") + " btn-full";
+        fillBtn.textContent = isFullScreen ? "✓ Full Screen (click to restore)" : "⛶ Fill Screen";
+        fillBtn.type = "button";
+        fillBtn.title = isFullScreen ? "Restore to previous size" : "Resize image to fill entire screen";
+        fillBtn.addEventListener("click", () => {
+          if (widget.x === 0 && widget.y === 0 && 
+              widget.width === CANVAS_WIDTH && 
+              widget.height === CANVAS_HEIGHT) {
+            // Restore to reasonable default size
+            widget.x = 50;
+            widget.y = 50;
+            widget.width = 200;
+            widget.height = 150;
+          } else {
+            // Fill screen
+            widget.x = 0;
+            widget.y = 0;
+            widget.width = CANVAS_WIDTH;
+            widget.height = CANVAS_HEIGHT;
+          }
+          renderCanvas();
+          renderPropertiesPanel();
+          scheduleSnippetUpdate();
+        });
+        fillWrap.appendChild(fillBtn);
+        panel.appendChild(fillWrap);
       }
 
       if (["text", "sensor_text"].includes(type)) {
