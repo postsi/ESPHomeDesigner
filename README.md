@@ -59,15 +59,7 @@ The template includes all the hardware setup: display driver, buttons, buzzer, s
 
 1. Copy the generated YAML snippet
 2. Paste it at the bottom of your ESPHome config (below the hardware sections)
-3. **Important:** Only paste these sections from the snippet:
-   - `globals:`
-   - `font:`
-   - `text_sensor:` (only if you used sensor widgets)
-   - `button:` (optional - for HA control)
-   - `script:`
-   - `display:`
-4. Do NOT copy `output:`, `rtttl:`, `sensor:`, or `time:` - these are already in the hardware template!
-5. Compile and flash via ESPHome
+3. Compile and flash via ESPHome
 
 Done! Your custom dashboard is now running on the reTerminal.
 
@@ -120,19 +112,6 @@ The generator produces **additive YAML only** - it won't touch your WiFi, API, o
 
 The workflow is safe and deterministic - same layout always produces the same YAML.
 
-## Automation Ideas
-
-Once your dashboard is running, you can use Home Assistant automations to:
-
-- **Doorbell alert** - Switch to page 2 and play the Star Wars theme on the buzzer when someone rings the doorbell
-- **Weather alerts** - Jump to alert page when severe weather detected
-- **Timer display** - Show kitchen timer on page 3 when cooking
-- **Button triggers** - Use physical buttons to trigger HA automations
-- **Bedtime mode** - Deep sleep between midnight-6am, wake for hourly weather updates
-- **Presence detection** - Show "Welcome home" page when you arrive
-- **Custom sounds** - Play any RTTTL melody on the buzzer for notifications
-
-The reTerminal becomes both an **information display** and a **physical control interface** for your smart home. The buzzer can play any RTTTL (RingTone Text Transfer Language) melody you want - Star Wars, Nokia ringtone, custom chimes, whatever!
 
 ## Hardware Support
 
