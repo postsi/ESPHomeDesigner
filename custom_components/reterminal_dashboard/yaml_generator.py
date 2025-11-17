@@ -258,21 +258,19 @@ def _generate_fonts(device: DeviceConfig) -> str:
 
 def _generate_text_sensors(device: DeviceConfig) -> str:
     """
-    Generate ONLY text_sensor blocks for HomeAssistant entities used in sensor_text widgets.
-    sensor: section is now in the hardware template.
+    Generate text_sensor blocks for ALL HomeAssistant entities used in any widget.
+    Includes sensor_text, progress_bar, battery_icon, and any other widget with entity_id.
     """
-    # Collect all unique entity_ids from sensor_text widgets
+    # Collect all unique entity_ids from ALL widgets that use entities
     entity_ids = set()
     for page in device.pages:
         for widget in page.widgets:
-            wtype = (widget.type or "").lower()
-            if wtype in ("sensor", "sensor_text"):
-                entity_id = (widget.entity_id or "").strip()
-                if entity_id:
-                    entity_ids.add(entity_id)
+            entity_id = (widget.entity_id or "").strip()
+            if entity_id:
+                entity_ids.add(entity_id)
     
     if not entity_ids:
-        return "# No sensor_text widgets configured - no text_sensor section needed"
+        return "# No widgets with entities configured - no text_sensor section needed"
     
     # Build text_sensor entries for each unique entity
     text_sensor_entries = []
@@ -679,13 +677,14 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         value_format = props.get("value_format", "label_value")
         label_font_size = int(props.get("label_font_size", 14) or 14)
         value_font_size = int(props.get("value_font_size", 20) or 20)
+        value_format = props.get("value_format", "label_value")
         
         if entity_id:
             # Generate safe ID from entity_id
             safe_id = entity_id.replace(".", "_").replace("-", "_")
             
-            # Add marker comment for parser
-            content.append(f'{indent}// widget:sensor_text id:{widget.id} type:sensor_text x:{x} y:{y} w:{w} h:{h} ent:{entity_id} title:"{label}"')
+            # Add marker comment for parser with font sizes
+            content.append(f'{indent}// widget:sensor_text id:{widget.id} type:sensor_text x:{x} y:{y} w:{w} h:{h} ent:{entity_id} title:"{label}" label_font:{label_font_size} value_font:{value_font_size} format:{value_format}')
             
             if value_format == "label_newline_value" and label:
                 # Label on one line, value on another - use separate fonts
@@ -708,8 +707,8 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
             # No entity_id configured - show placeholder
             placeholder = label or "sensor"
             font = _resolve_font_by_size(value_font_size)
-            # Add marker comment for parser
-            content.append(f'{indent}// widget:sensor_text id:{widget.id} type:sensor_text x:{x} y:{y} w:{w} h:{h} title:"{label}"')
+            # Add marker comment for parser with font sizes
+            content.append(f'{indent}// widget:sensor_text id:{widget.id} type:sensor_text x:{x} y:{y} w:{w} h:{h} title:"{label}" label_font:{label_font_size} value_font:{value_font_size} format:{value_format}')
             content.append(f'{indent}// No entity_id configured for this sensor_text widget')
             content.append(f'{indent}it.printf({x}, {y}, {font}, {fg}, "{placeholder}: N/A");')
         _wrap_with_condition(dst, indent, widget, content)
