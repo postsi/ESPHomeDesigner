@@ -1385,15 +1385,32 @@
     }
 
     function applyImportedLayout(layout) {
+      console.log("=== applyImportedLayout called ===");
+      console.log("Layout:", JSON.stringify(layout, null, 2));
+      
       if (!layout || !Array.isArray(layout.pages)) {
+        console.error("Invalid layout - missing pages array");
         throw new Error("invalid_layout");
       }
+      
+      console.log("Pages before mapping:", layout.pages.length);
+      layout.pages.forEach((p, i) => {
+        console.log(`Page ${i}: ${p.widgets ? p.widgets.length : 0} widgets`);
+      });
+      
       pages = layout.pages.map((p, idx) => ({
         id: p.id || `page_${idx}`,
         name: p.name || `Page ${idx + 1}`,
         widgets: Array.isArray(p.widgets) ? p.widgets : []
       }));
+      
+      console.log("Pages after mapping:", pages.length);
+      pages.forEach((p, i) => {
+        console.log(`Mapped page ${i}: ${p.widgets.length} widgets`, p.widgets.map(w => w.id));
+      });
+      
       if (!pages.length) {
+        console.warn("No pages, creating default empty page");
         pages = [
           {
             id: "page_0",
@@ -1409,6 +1426,7 @@
       renderPagesSidebar();
       renderCanvas();
       renderPropertiesPanel();
+      console.log("=== applyImportedLayout completed ===");
     }
 
     async function handleImportSnippetConfirm() {
@@ -1512,6 +1530,10 @@
     if (updateLayoutBtn) {
       updateLayoutBtn.addEventListener("click", async () => {
         const yaml = snippetBox.value || "";
+        console.log("=== Update Layout from YAML clicked ===");
+        console.log("YAML length:", yaml.length);
+        console.log("YAML first 200 chars:", yaml.substring(0, 200));
+        
         if (!yaml.trim()) {
           sidebarStatus.innerHTML = '<span style="color: var(--danger);">YAML is empty. Generate snippet first or paste YAML.</span>';
           return;
@@ -1519,6 +1541,7 @@
 
         if (hasHaBackend()) {
           try {
+            console.log("Trying HA backend import...");
             const resp = await fetch(`${HA_API_BASE}/import_snippet`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1528,11 +1551,13 @@
             if (!resp.ok) {
               const data = await resp.json().catch(() => ({}));
               const msg = data.message || data.error || `Import failed with status ${resp.status}`;
+              console.error("HA backend import failed:", msg);
               sidebarStatus.innerHTML = `<span style="color: var(--danger);">Import error: ${msg}</span>`;
               return;
             }
 
             const result = await resp.json();
+            console.log("HA backend returned layout:", JSON.stringify(result, null, 2));
             applyImportedLayout(result);
             sidebarStatus.innerHTML = '<span style="color: var(--success);">✓ Layout updated from YAML via HA backend</span>';
             return;
@@ -1542,7 +1567,9 @@
         }
 
         try {
+          console.log("Using offline parser...");
           const offlineLayout = parseSnippetYamlOffline(yaml);
+          console.log("Offline parser returned layout:", JSON.stringify(offlineLayout, null, 2));
           applyImportedLayout(offlineLayout);
           sidebarStatus.innerHTML = '<span style="color: var(--success);">✓ Layout updated from YAML (offline parser)</span>';
         } catch (err) {
