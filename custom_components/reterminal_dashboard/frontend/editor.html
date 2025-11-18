@@ -474,9 +474,8 @@
     }
 
     .snippet-area {
-      flex: 0 1 auto;
+      flex: 1 1 auto;
       min-height: 200px;
-      max-height: 35vh;
       width: 900px;
       max-width: 100%;
       margin: 0;
@@ -3904,6 +3903,19 @@
       }
 
       try {
+        // First, save the current layout to backend so it knows about the changes
+        const body = getPagesPayload();
+        const saveResp = await fetch("/api/reterminal_dashboard/layout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        
+        if (!saveResp.ok) {
+          throw new Error("Failed to save layout to backend");
+        }
+
+        // Now fetch the generated snippet from backend
         const resp = await fetch("/api/reterminal_dashboard/snippet", { method: "GET" });
         if (!resp.ok) {
           throw new Error("HTTP " + resp.status);
@@ -3911,6 +3923,7 @@
         const text = await resp.text();
         snippetBox.value = (text && text.trim()) ? text : "# Empty snippet";
       } catch (err) {
+        console.warn("Backend error, using local generation:", err);
         snippetBox.value =
           local + "\n# Backend unreachable, showing local preview only.";
       }
