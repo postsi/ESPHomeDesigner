@@ -4347,6 +4347,41 @@
       snippetFullscreenModal.classList.add("hidden");
     };
 
+    // ============================================================================
+    // Page Settings Modal Functions
+    // CRITICAL: These functions must exist or JavaScript will crash on page load
+    // ============================================================================
+    function closePageSettingsModal() {
+      const modal = document.getElementById("pageSettingsModal");
+      if (modal) modal.classList.add("hidden");
+      currentPageSettingsTarget = null;
+    }
+
+    function savePageSettings() {
+      if (!currentPageSettingsTarget) return;
+      
+      const nameInput = document.getElementById("pageSettingsName");
+      const refreshInput = document.getElementById("pageSettingsRefresh");
+      
+      if (nameInput) {
+        currentPageSettingsTarget.name = nameInput.value || "Page";
+      }
+      
+      if (refreshInput) {
+        const val = refreshInput.value.trim();
+        if (val === "") {
+          currentPageSettingsTarget.refresh_s = null;
+        } else {
+          const num = parseInt(val, 10);
+          currentPageSettingsTarget.refresh_s = (num >= 0) ? num : null;
+        }
+      }
+      
+      renderPagesSidebar();
+      scheduleSnippetUpdate();
+      closePageSettingsModal();
+    }
+
     const pageSettingsClose = document.getElementById("pageSettingsClose");
     const pageSettingsSave = document.getElementById("pageSettingsSave");
     if (pageSettingsClose) {

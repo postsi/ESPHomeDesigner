@@ -408,6 +408,11 @@ def _parse_widget_line(line: str) -> ParsedWidget | None:
                     meta[key] = val.strip()
             i += 1
 
+        # ============================================================================
+        # CRITICAL: Widget coordinate and dimension parsing
+        # DO NOT CHANGE: These extract x, y, width, height from YAML marker comments
+        # These values MUST be preserved exactly as generated to maintain widget positions
+        # ============================================================================
         wtype = meta.get("type") or parts[0].split(":")[1]
         wid = meta.get("id", f"w_{abs(hash(line)) % 99999}")
         x = int(meta.get("x", "40"))
@@ -423,7 +428,10 @@ def _parse_widget_line(line: str) -> ParsedWidget | None:
         format_val = meta.get("format")
         invert_val = meta.get("invert", "false").lower() in ("true", "1", "yes")
         
-        # Extract all properties from markers
+        # ============================================================================
+        # CRITICAL: Widget property extraction from markers
+        # DO NOT CHANGE: These preserve widget styling (color, size, opacity, etc.)
+        # ============================================================================
         font_family = meta.get("font_family")
         font_style = meta.get("font_style")
         color = meta.get("color")

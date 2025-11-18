@@ -637,7 +637,11 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
     
     Supports conditional visibility based on entity state.
     """
-    # Clamp to canvas
+    # ============================================================================
+    # CRITICAL: Widget coordinate clamping
+    # DO NOT CHANGE: Clamps widget positions to canvas bounds (800x480)
+    # These clamped values are written to YAML markers and must be parsed back exactly
+    # ============================================================================
     x = max(0, min(widget.x, IMAGE_WIDTH))
     y = max(0, min(widget.y, IMAGE_HEIGHT))
     w = max(1, min(widget.width, IMAGE_WIDTH - x))
@@ -810,7 +814,11 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         # Generate safe ID from entity_id
         safe_id = entity_id.replace(".", "_").replace("-", "_")
         
-        # Add marker comment for parser
+        # ============================================================================
+        # CRITICAL: Progress bar marker comment format
+        # DO NOT CHANGE: Parser depends on exact format: x:{x} y:{y} w:{w} h:{h}
+        # These coordinates must be preserved for round-trip editing to work
+        # ============================================================================
         show_label_str = "true" if show_label else "false"
         show_pct_str = "true" if show_percentage else "false"
         content.append(f'{indent}// widget:progress_bar id:{widget.id} type:progress_bar x:{x} y:{y} w:{w} h:{h} entity:{entity_id} label:"{label}" bar_height:{bar_height} border:{border_width} show_label:{show_label_str} show_pct:{show_pct_str} color:{base_color}')
@@ -871,7 +879,11 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         # Generate safe ID from entity_id
         safe_id = entity_id.replace(".", "_").replace("-", "_")
         
-        # Add marker comment for parser
+        # ============================================================================
+        # CRITICAL: Battery icon marker comment format
+        # DO NOT CHANGE: Parser depends on exact format: x:{x} y:{y} w:{w} h:{h}
+        # These coordinates must be preserved for round-trip editing to work
+        # ============================================================================
         content.append(f'{indent}// widget:battery_icon id:{widget.id} type:battery_icon x:{x} y:{y} w:{w} h:{h} entity:{entity_id} size:{size} color:{base_color}')
         
         # Add logic to pick battery icon based on level
