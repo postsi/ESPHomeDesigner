@@ -806,7 +806,8 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         
         if not entity_id:
             # No entity configured - show placeholder
-            content.append(f'{indent}// widget:progress_bar id:{widget.id} (no entity configured)')
+            # CRITICAL: Must include coordinates even if no entity, otherwise parser defaults to 40,40
+            content.append(f'{indent}// widget:progress_bar id:{widget.id} type:progress_bar x:{x} y:{y} w:{w} h:{h} (no entity configured)')
             content.append(f'{indent}it.rectangle({x}, {y}, {w}, {h}, {fg});')
             _wrap_with_condition(dst, indent, widget, content)
             return
@@ -871,7 +872,8 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         
         if not entity_id:
             # No entity configured - show static battery icon
-            content.append(f'{indent}// widget:battery_icon id:{widget.id} (no entity configured)')
+            # CRITICAL: Must include coordinates even if no entity, otherwise parser defaults to 40,40
+            content.append(f'{indent}// widget:battery_icon id:{widget.id} type:battery_icon x:{x} y:{y} w:{w} h:{h} (no entity configured)')
             content.append(f'{indent}it.printf({x}, {y}, id({font_id}), {fg}, "\\U000F0079");  // battery')
             _wrap_with_condition(dst, indent, widget, content)
             return
