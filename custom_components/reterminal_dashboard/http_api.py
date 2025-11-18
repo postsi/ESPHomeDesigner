@@ -58,6 +58,9 @@ class ReTerminalLayoutView(HomeAssistantView):
     async def get(self, request) -> Any:  # type: ignore[override]
         """Return the stored layout for the default device."""
         device = await self._async_get_default_device()
+        _LOGGER.info("Loading layout: %d pages, %d total widgets", 
+                     len(device.pages),
+                     sum(len(p.widgets) for p in device.pages))
         return self.json(device.to_dict(), status_code=HTTPStatus.OK)
 
     async def post(self, request) -> Any:  # type: ignore[override]
@@ -71,6 +74,10 @@ class ReTerminalLayoutView(HomeAssistantView):
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
+        _LOGGER.info("Received layout update with %d pages, %d total widgets", 
+                     len(body.get("pages", [])),
+                     sum(len(p.get("widgets", [])) for p in body.get("pages", [])))
+
         updated = await self.storage.async_update_layout_default(body)
         if not isinstance(updated, DeviceConfig):
             # async_update_layout_default should always return a DeviceConfig,
@@ -80,6 +87,10 @@ class ReTerminalLayoutView(HomeAssistantView):
                 {"error": "update_failed"},
                 status_code=HTTPStatus.BAD_REQUEST,
             )
+
+        _LOGGER.info("Layout saved successfully: %d pages, %d total widgets", 
+                     len(updated.pages),
+                     sum(len(p.widgets) for p in updated.pages))
 
         return self.json(updated.to_dict(), status_code=HTTPStatus.OK)
 

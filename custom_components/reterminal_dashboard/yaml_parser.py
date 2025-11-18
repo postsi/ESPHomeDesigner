@@ -251,12 +251,13 @@ def yaml_to_layout(snippet: str) -> DeviceConfig:
                 props=props,
             )
             # Log parsed coordinates for debugging
-            _LOGGER.debug(f"Parsed widget {pw.id} type={pw.type} x={pw.x} y={pw.y} w={pw.width} h={pw.height}")
+            _LOGGER.debug(f"Parsed widget {pw.id} type={pw.type} x={pw.x} y={pw.y} w={pw.width} h={pw.height} props={list(props.keys())}")
             wc.clamp_to_canvas()
             page.widgets.append(wc)
         device.pages.append(page)
 
     device.ensure_pages()
+    _LOGGER.info(f"yaml_to_layout: Parsed {len(device.pages)} pages with {sum(len(p.widgets) for p in device.pages)} total widgets")
     return device
 
 
