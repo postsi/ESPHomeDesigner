@@ -42,8 +42,7 @@ Then use the provided hardware template:
 1. Open `esphome/reterminal_e1001_lambda.yaml` in this repo
 2. Follow the step-by-step instructions in the template
 3. Create a new ESPHome device and paste the hardware sections
-4. Change the framework from `esp-idf` to `arduino` in your ESP32 config
-5. Flash the base config to your reTerminal
+4. Flash the base config to your reTerminal
 
 The template includes all the hardware setup: display driver, buttons, buzzer, sensors, battery monitoring.
 
@@ -160,8 +159,6 @@ All exposed as Home Assistant entities for use in automations.
 - Check `update_interval: never` in display config
 - Verify buttons are wired to `component.update: epaper_display`
 
-**Wrong framework error?**
-- Change ESP32 framework from `esp-idf` to `arduino` in your config
 
 **Duplicate section errors?**
 - Only paste `globals`, `font`, `text_sensor`, `button`, `script`, `display` from generated snippet

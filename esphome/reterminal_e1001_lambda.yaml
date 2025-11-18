@@ -13,7 +13,6 @@
 #         - Name: reterminal (or your choice)
 #         - Select: ESP32-S3
 #         - ESPHome will auto-generate a basic config
-#         - IMPORTANT: Change framework from "esp-idf" to "arduino"
 #
 # STEP 3: Copy the "HARDWARE SECTIONS" below (from ▼ START to ▲ END)
 #         Paste them AFTER the captive_portal: line in your ESPHome config
@@ -34,8 +33,6 @@
 #         - display:
 #         Paste them at the end of your config (see STEP 6 marker below)
 #
-# IMPORTANT: Do NOT copy output:, rtttl:, sensor:, or time: from the
-#            generated snippet - these are already in the hardware sections!
 #
 # ============================================================================
 
@@ -63,7 +60,7 @@ esphome:
 # esp32:
 #   board: esp32-s3-devkitc-1
 #   framework:
-#     type: arduino    ← Make sure this is "arduino" not "esp-idf"
+#     type: esp-idf
 #
 # logger:
 #
