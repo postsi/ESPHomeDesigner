@@ -69,6 +69,13 @@ class ReTerminalDashboardPanelView(HomeAssistantView):
             try:
                 async with aiofiles.open(editor_path_integration, mode='r', encoding='utf-8') as f:
                     html = await f.read()
+                
+                # Replace relative links with absolute static paths for HA serving
+                # This allows the file on disk to use relative paths (for local testing)
+                # while HA serves it with correct absolute paths
+                html = html.replace('href="editor.css"', 'href="/reterminal-dashboard/static/editor.css?v=1"')
+                html = html.replace('src="editor.js"', 'src="/reterminal-dashboard/static/editor.js?v=1"')
+
                 _LOGGER.info("✓ Serving editor from integration: %s (%d bytes)", editor_path_integration, len(html))
                 return web.Response(
                     body=html,
@@ -116,6 +123,57 @@ class ReTerminalDashboardPanelView(HomeAssistantView):
             status=200,
             content_type="text/html",
         )
+
+
+class ReTerminalDashboardStaticView(HomeAssistantView):
+    """Serve static frontend assets (CSS/JS) manually."""
+
+    url = "/reterminal-dashboard/static/{filename}"
+    name = "reterminal_dashboard:static"
+    requires_auth = False
+    cors_allowed = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request, filename: str) -> Any:
+        """Serve a static file."""
+        from pathlib import Path
+        import aiofiles
+
+        # Allow only specific files for security
+        if filename not in ["editor.css", "editor.js"]:
+            return web.Response(status=404, text="Not Found")
+
+        # Look in integration's frontend/ directory
+        integration_dir = Path(__file__).parent / "frontend"
+        file_path = integration_dir / filename
+
+        if not file_path.exists():
+            _LOGGER.error("Static file not found: %s", file_path)
+            return web.Response(status=404, text="File not found")
+
+        try:
+            # Determine content type
+            content_type = "text/css" if filename.endswith(".css") else "application/javascript"
+            
+            async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
+                content = await f.read()
+
+            _LOGGER.info("✓ Serving static file: %s (%d bytes)", filename, len(content))
+            return web.Response(
+                body=content,
+                status=200,
+                content_type=content_type,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+        except Exception as e:
+            _LOGGER.error("Failed to serve static file %s: %s", filename, e)
+            return web.Response(status=500, text="Internal Server Error")
 
     def _generate_full_editor_html(self) -> str:
         """Generate the complete editor HTML with all features."""

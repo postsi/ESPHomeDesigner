@@ -248,22 +248,35 @@ def _find_display_block(data: Any) -> Dict[str, Any] | None:
           id: epaper_display
           lambda: |-
             ...
+    
+    Fallback: If no block with id 'epaper_display' is found, return the first
+    block that has a 'lambda' property.
     """
     if not isinstance(data, dict):
         return None
 
     display = data.get("display")
+    candidate = None
+
     if isinstance(display, list):
         for block in display:
             if not isinstance(block, dict):
                 continue
-            if "lambda" in block and block.get("id") == "epaper_display":
-                return block
-    elif isinstance(display, dict):
-        if "lambda" in display and display.get("id") == "epaper_display":
-            return display
+            if "lambda" in block:
+                # Prefer the one with the correct ID
+                if block.get("id") == "epaper_display":
+                    return block
+                # Keep as candidate if we don't find the exact match
+                if candidate is None:
+                    candidate = block
 
-    return None
+    elif isinstance(display, dict):
+        if "lambda" in display:
+            if display.get("id") == "epaper_display":
+                return display
+            candidate = display
+
+    return candidate
 
 
 def _parse_pages_from_lambda(lines: List[str]) -> Dict[int, List[ParsedWidget]]:

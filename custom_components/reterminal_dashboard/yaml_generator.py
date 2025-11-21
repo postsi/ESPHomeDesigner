@@ -1048,12 +1048,20 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
             content.append(f'{indent}// widget:sensor_text id:{widget.id} type:sensor_text x:{x} y:{y} w:{w} h:{h} ent:{entity_id} title:"{label}" label_font:{label_font_size} value_font:{value_font_size} format:{value_format} font_family:{font_family} font_weight:{font_weight} precision:{precision} local:{is_local}')
             
             # Determine value expression and format string
-            if precision >= 0:
-                unit = props.get("unit", "")
-                val_expr = f"atof(id({safe_id}).state.c_str())"
-                fmt_spec = f"%.{precision}f{unit}"
+            unit = props.get("unit", "")
+            
+            # Check if it's a numeric sensor (float state)
+            # If precision is set OR it's a 'sensor.' domain, treat as float.
+            # ESPHome 'sensor' components always have float state.
+            is_numeric = (precision >= 0) or entity_id.startswith("sensor.")
+            
+            if is_numeric:
+                # Numeric sensor
+                p = precision if precision >= 0 else 1  # Default to 1 decimal if not set
+                val_expr = f"id({safe_id}).state"
+                fmt_spec = f"%.{p}f{unit}"
             else:
-                unit = props.get("unit", "")
+                # Text sensor or other (string state)
                 val_expr = f"id({safe_id}).state.c_str()"
                 fmt_spec = f"%s{unit}"
 
@@ -1126,6 +1134,10 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         bar_height = int(props.get("bar_height", 15) or 15)
         border_width = int(props.get("border_width", 1) or 1)
         
+        show_label_str = "true" if show_label else "false"
+        show_pct_str = "true" if show_percentage else "false"
+        is_local = "true" if props.get("is_local_sensor") else "false"
+
         if not entity_id:
             # No entity configured - show placeholder
             # CRITICAL: Must include coordinates even if no entity, otherwise parser defaults to 40,40
@@ -1146,10 +1158,7 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         # DO NOT CHANGE: Parser depends on exact format: x:{x} y:{y} w:{w} h:{h}
         # These coordinates must be preserved for round-trip editing to work
         # ============================================================================
-        show_label_str = "true" if show_label else "false"
-        show_pct_str = "true" if show_percentage else "false"
-        is_local = "true" if props.get("is_local_sensor") else "false"
-        content.append(f'{indent}// widget:progress_bar id:{widget.id} type:progress_bar x:{x} y:{y} w:{w} h:{h} ent:{entity_id} title:"{label}" show_label:{show_label} show_pct:{show_pct} bar_h:{bar_height} border_w:{border_width} color:{base_color} local:{is_local}')
+        content.append(f'{indent}// widget:progress_bar id:{widget.id} type:progress_bar x:{x} y:{y} w:{w} h:{h} ent:{entity_id} title:"{label}" show_label:{show_label_str} show_pct:{show_pct_str} bar_h:{bar_height} border_w:{border_width} color:{base_color} local:{is_local}')
         
         # Calculate vertical layout
         label_y = y
@@ -1300,11 +1309,13 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         if fill:
             if use_grey_pattern:
                 # Grey: create 50% checkerboard pattern for visual distinction from solid black
-                content.append(f"{indent}// Grey fill using 50% checkerboard dithering pattern")
+                content.append(f"{indent}// Opaque Grey fill using 50% checkerboard dithering pattern")
                 content.append(f"{indent}for (int dy = 0; dy < {h}; dy++) {{")
                 content.append(f"{indent}  for (int dx = 0; dx < {w}; dx++) {{")
                 content.append(f"{indent}    if ((dx + dy) % 2 == 0) {{")
                 content.append(f"{indent}      it.draw_pixel_at({x}+dx, {y}+dy, COLOR_ON);")
+                content.append(f"{indent}    }} else {{")
+                content.append(f"{indent}      it.draw_pixel_at({x}+dx, {y}+dy, COLOR_OFF);")
                 content.append(f"{indent}    }}")
                 content.append(f"{indent}  }}")
                 content.append(f"{indent}}}")
@@ -1344,11 +1355,15 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         _wrap_with_condition(dst, indent, widget, content)
         return
 
+
+
     # Circle / filled circle (use width/height box)
     if wtype == "shape_circle":
-        r = max(1, min(w, h) // 2)
-        cx = x + w // 2
-        cy = y + h // 2
+        # Revert to simple circle logic (no ellipse support in ESPHome display)
+        # Use the smaller dimension to ensure it fits
+        r = min(w, h) // 2
+        cx = x + (w // 2)
+        cy = y + (h // 2)
         fill = bool(props.get("fill"))
         border_width = int(props.get("border_width", 1) or 1)
         opacity = int(props.get("opacity", 100) or 100)
@@ -1362,20 +1377,21 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
         
         if fill:
             if use_grey_pattern:
-                # Grey: create 50% checkerboard pattern within circle bounds
-                content.append(f"{indent}// Grey fill using 50% checkerboard dithering pattern")
+                # Grey: create 50% checkerboard pattern within circle
+                content.append(f"{indent}// Opaque Grey fill using 50% checkerboard dithering pattern")
                 content.append(f"{indent}for (int dy = -{r}; dy <= {r}; dy++) {{")
                 content.append(f"{indent}  for (int dx = -{r}; dx <= {r}; dx++) {{")
                 content.append(f"{indent}    if (dx*dx + dy*dy <= {r}*{r}) {{")
                 content.append(f"{indent}      if ((dx + dy) % 2 == 0) {{")
                 content.append(f"{indent}        it.draw_pixel_at({cx}+dx, {cy}+dy, COLOR_ON);")
+                content.append(f"{indent}      }} else {{")
+                content.append(f"{indent}        it.draw_pixel_at({cx}+dx, {cy}+dy, COLOR_OFF);")
                 content.append(f"{indent}      }}")
                 content.append(f"{indent}    }}")
                 content.append(f"{indent}  }}")
-                content.append(f"{indent}  }}")
                 content.append(f"{indent}}}")
             elif opacity < 100:
-                # Opacity simulation for circle
+                # Opacity simulation
                 content.append(f"{indent}// Opacity {opacity}% simulation")
                 content.append(f"{indent}for (int dy = -{r}; dy <= {r}; dy++) {{")
                 content.append(f"{indent}  for (int dx = -{r}; dx <= {r}; dx++) {{")
@@ -1387,15 +1403,16 @@ def _append_widget_render(dst: List[str], indent: str, widget: WidgetConfig) -> 
                 content.append(f"{indent}  }}")
                 content.append(f"{indent}}}")
             else:
-                # Solid fill (black or white)
+                # Solid fill
                 content.append(f"{indent}it.filled_circle({cx}, {cy}, {r}, {fg});")
+            
             if border_width > 1:
                 content.append(f"{indent}it.circle({cx}, {cy}, {r}, {fg});")
         else:
             if border_width <= 1:
                 content.append(f"{indent}it.circle({cx}, {cy}, {r}, {fg});")
             else:
-                content.append(f"{indent}// circle with border_width={border_width}")
+                content.append(f"{indent}// border_width={border_width}")
                 content.append(f"{indent}for (int i = 0; i < {border_width}; i++) {{")
                 content.append(f"{indent}  it.circle({cx}, {cy}, {r}-i, {fg});")
                 content.append(f"{indent}}}")

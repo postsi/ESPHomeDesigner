@@ -167,24 +167,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.http.register_view(ReTerminalDashboardFontView(hass))
     _LOGGER.info("%s: Font view registered at /reterminal-dashboard/materialdesignicons-webfont.ttf", DOMAIN)
 
+    # Register static view for frontend assets (CSS/JS)
+    # This manually serves editor.css and editor.js to avoid issues with register_static_path
+    from .panel import ReTerminalDashboardStaticView
+    hass.http.register_view(ReTerminalDashboardStaticView(hass))
+    _LOGGER.info("%s: Static view registered at /reterminal-dashboard/static/{filename}", DOMAIN)
+
     # Register the sidebar panel
-    # Note: This requires 'frontend' to be loaded, which is a dependency of this integration
-    if "frontend" in hass.data:
-        try:
-            hass.components.frontend.async_register_built_in_panel(
-                hass,
-                component_name="iframe",  # Use iframe panel type to load our view
-                sidebar_title="reTerminal",
-                sidebar_icon="mdi:tablet-dashboard",
-                frontend_url_path="reterminal-dashboard",
-                config={"url": "/reterminal-dashboard"},
-                require_admin=True,
-            )
-            _LOGGER.info("%s: Sidebar panel registered", DOMAIN)
-        except Exception as e:
-            _LOGGER.warning("%s: Failed to register sidebar panel: %s", DOMAIN, e)
-    else:
-        _LOGGER.warning("%s: Frontend integration not found, skipping sidebar registration", DOMAIN)
+    try:
+        from homeassistant.components import frontend
+        frontend.async_register_built_in_panel(
+            hass,
+            component_name="iframe",  # Use iframe panel type to load our view
+            sidebar_title="reTerminal",
+            sidebar_icon="mdi:tablet-dashboard",
+            frontend_url_path="reterminal-dashboard",
+            config={"url": "/reterminal-dashboard"},
+            require_admin=True,
+        )
+        _LOGGER.info("%s: Sidebar panel registered", DOMAIN)
+    except Exception as e:
+        _LOGGER.warning("%s: Failed to register sidebar panel: %s", DOMAIN, e)
 
     return True
 
