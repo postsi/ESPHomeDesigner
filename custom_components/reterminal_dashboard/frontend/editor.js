@@ -3590,6 +3590,23 @@ function renderPropertiesPanel() {
             entityWrap.appendChild(entityRow);
             panel.appendChild(entityWrap);
 
+            const textSensorWrap = document.createElement("div");
+            textSensorWrap.className = "field";
+            const textSensorLbl = document.createElement("div");
+            textSensorLbl.className = "prop-label";
+            textSensorLbl.textContent = "Is Text Sensor?";
+            const textSensorCb = document.createElement("input");
+            textSensorCb.type = "checkbox";
+            textSensorCb.checked = !!widget.props.is_text_sensor;
+            textSensorCb.addEventListener("change", () => {
+                widget.props.is_text_sensor = textSensorCb.checked;
+                renderCanvas();
+                scheduleSnippetUpdate();
+            });
+            textSensorWrap.appendChild(textSensorLbl);
+            textSensorWrap.appendChild(textSensorCb);
+            panel.appendChild(textSensorWrap);
+
             const localWrap = document.createElement("div");
             localWrap.className = "field";
             const localLbl = document.createElement("div");
@@ -4388,13 +4405,19 @@ function generateSnippetLocally() {
             if (w.entity_id) {
                 const parts = w.entity_id.split('.');
                 if (parts.length === 2) {
-                    usedEntities.set(w.entity_id, { domain: parts[0], entity_id: w.entity_id });
+                    let domain = parts[0];
+                    // Force 'text_sensor' domain if widget is explicitly marked as text sensor
+                    if (p.is_text_sensor) {
+                        domain = 'text_sensor';
+                    }
+                    usedEntities.set(w.entity_id, { domain: domain, entity_id: w.entity_id });
                 }
             }
             // Check condition entity
             if (w.condition_entity) {
                 const parts = w.condition_entity.split('.');
                 if (parts.length === 2) {
+                    // Condition entities are usually binary_sensor or sensor, keep original domain
                     usedEntities.set(w.condition_entity, { domain: parts[0], entity_id: w.condition_entity });
                 }
             }
