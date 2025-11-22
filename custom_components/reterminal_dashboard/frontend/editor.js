@@ -915,7 +915,50 @@ function initDefaultLayout() {
         {
             id: "page_0",
             name: "Overview",
-            widgets: []
+            widgets: [
+                {
+                    id: "w_default_temp",
+                    type: "sensor_text",
+                    x: 40,
+                    y: 40,
+                    width: 200,
+                    height: 60,
+                    title: "Temperature",
+                    entity_id: "sensor.reterminal_e1001_reterminal_onboard_temperature",
+                    props: {
+                        label_font_size: 14,
+                        value_font_size: 28,
+                        value_format: "label_value",
+                        color: "black",
+                        font_style: "regular",
+                        font_weight: 400,
+                        italic: false,
+                        unit: "°C",
+                        precision: 1
+                    }
+                },
+                {
+                    id: "w_default_hum",
+                    type: "sensor_text",
+                    x: 260,
+                    y: 40,
+                    width: 200,
+                    height: 60,
+                    title: "Humidity",
+                    entity_id: "sensor.reterminal_e1001_reterminal_onboard_humidity",
+                    props: {
+                        label_font_size: 14,
+                        value_font_size: 28,
+                        value_format: "label_value",
+                        color: "black",
+                        font_style: "regular",
+                        font_weight: 400,
+                        italic: false,
+                        unit: "%",
+                        precision: 1
+                    }
+                }
+            ]
         }
     ];
     currentPageIndex = 0;
@@ -3163,22 +3206,6 @@ function renderPropertiesPanel() {
         helpWrap.style.fontSize = "9px";
         helpWrap.style.color = "var(--muted)";
         helpWrap.style.marginBottom = "8px";
-        helpWrap.innerHTML = "💡 Enter ESPHome image path, e.g.:<br/>" +
-            "<code style='background:#f0f0f0;padding:2px 4px;border-radius:2px;'>/config/esphome/images/photo.jpg</code><br/>" +
-            "<span style='color:#4a9eff;'>ℹ️ Widget size controls ESPHome resize parameter</span>";
-        panel.appendChild(helpWrap);
-
-        addLabeledInput("Image path", "text", widget.props.path || "", (v) => {
-            widget.props.path = v;
-            renderCanvas();
-        });
-
-        const invertWrap = document.createElement("div");
-        invertWrap.className = "field";
-        const invertLbl = document.createElement("div");
-        invertLbl.className = "prop-label";
-        invertLbl.textContent = "Invert colors";
-        const invertCb = document.createElement("input");
         invertCb.type = "checkbox";
         invertCb.checked = !!widget.props.invert;
         invertCb.addEventListener("change", () => {
@@ -4474,22 +4501,22 @@ function generateSnippetLocally() {
                     const textAlign = p.text_align || "TOP_LEFT";
                     const precision = parseInt(p.precision !== undefined ? p.precision : -1, 10);
                     const unit = p.unit || "";
+                    const isTextSensor = !!p.is_text_sensor;
 
-                    lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${label}" val_fmt:${valueFormat} lbl_size:${labelFontSize} val_size:${valueFontSize} color:${colorProp} align:${textAlign} precision:${precision} unit:"${unit}" local:${!!p.is_local_sensor}`);
+                    lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${label}" val_fmt:${valueFormat} lbl_size:${labelFontSize} val_size:${valueFontSize} color:${colorProp} align:${textAlign} precision:${precision} unit:"${unit}" local:${!!p.is_local_sensor} text_sensor:${isTextSensor}`);
 
                     if (entityId) {
                         const safeId = entityId.replace(/\./g, "_").replace(/-/g, "_");
-                        // Determine if it's a numeric sensor or text sensor based on domain or typical usage
-                        // For safety, we can try to use .state for numeric and .state.c_str() for text.
-                        // But ESPHome printf needs specific types.
-                        // We'll assume numeric sensor for 'sensor.' domain and string for others unless specified.
-                        const isNumeric = entityId.startsWith("sensor.");
+                        // Determine if it's a numeric sensor or text sensor
+                        // Default to numeric for 'sensor.' unless is_text_sensor is explicitly true
+                        const isNumeric = entityId.startsWith("sensor.") && !isTextSensor;
 
                         let valueExpr = `id(${safeId}).state`;
                         let fmtSpec = "%.1f";
                         if (precision >= 0) fmtSpec = `%${precision}.${precision}f`;
 
                         if (!isNumeric) {
+                            // For text sensors, .state is a std::string, so we need .c_str() for printf
                             valueExpr = `id(${safeId}).state.c_str()`;
                             fmtSpec = "%s";
                         }

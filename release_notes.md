@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.4.4
+- **Text Sensor Support**: Added "Is Text Sensor?" checkbox to `sensor_text` widget to correctly format string states (fixes `NaN` issue).
+- **Entity Picker Limit**: Increased the entity fetch limit from 1000 to 5000 to support larger Home Assistant installations.
+- **Default Template Fixes**: Updated `reterminal_e1001_lambda.yaml` to match default dashboard entity IDs (`sensor_reterminal_e1001_...`) and device name.
+- **Canvas Responsiveness**: Improved canvas scaling and centering on smaller screens.
+
+
 ## v0.4.3
 
 ### New Features

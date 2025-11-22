@@ -316,7 +316,7 @@ class ReTerminalEntitiesView(HomeAssistantView):
             )
 
             # Hard safety cap; avoid returning an excessively large payload.
-            if len(results) >= 1000:
+            if len(results) >= 5000:
                 break
 
         return self._json(results)
