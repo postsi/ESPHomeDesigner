@@ -13,6 +13,8 @@
   <small>Click to watch the demo video</small>
 </div>
 
+
+
 **No more hand-coding ESPHome display lambdas! 🎉**
 
 Got a Seeed Studio reTerminal E1001 and frustrated with manually writing display code? Yeah, me too. So I built a drag-and-drop editor that runs right inside Home Assistant.
