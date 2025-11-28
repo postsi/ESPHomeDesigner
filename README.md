@@ -5,7 +5,13 @@
 
 
 
-[![Watch the video](screenshots/Reterminal_Designer_v05.gif)](https://youtu.be/bzCbiUypN_4)
+<div align="center">
+  <a href="https://youtu.be/bzCbiUypN_4">
+    <img src="screenshots/Reterminal_Designer_v05.gif" alt="Watch the video">
+  </a>
+  <br>
+  <small>Click to watch the demo video</small>
+</div>
 
 **No more hand-coding ESPHome display lambdas! 🎉**
 
