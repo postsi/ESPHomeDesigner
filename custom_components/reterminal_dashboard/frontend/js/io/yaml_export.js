@@ -455,6 +455,10 @@ function generateSnippetLocally() {
     // Adjust this value if text appears misaligned on the e-ink display
     const TEXT_Y_OFFSET = 0;
 
+    // Global offset for rectangle widgets to match device rendering
+    // Negative value moves rectangles UP on the display
+    const RECT_Y_OFFSET = -15;
+
     // Helper to wrap widget rendering with conditional logic
     const wrapWithCondition = (lines, w, contentFn) => {
         const p = w.props || {};
@@ -1058,21 +1062,50 @@ function generateSnippetLocally() {
             const entityId = (w.entity_id || "").trim();
             const localSensorId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") || "none";
 
+            // Get line styling options
+            const lineType = (p.line_type || "SOLID").toUpperCase();
+            const lineThickness = parseInt(p.line_thickness || 3, 10);
+            const border = p.border !== false;
+            const continuous = !!p.continuous;
+
             lines.push(`  - id: ${safeId}`);
-            lines.push(`    sensor: ${localSensorId}`);
             lines.push(`    duration: ${duration}`);
             lines.push(`    width: ${width}`);
             lines.push(`    height: ${height}`);
+            lines.push(`    border: ${border}`);
 
             // Grid configuration (only output if grid is enabled)
             if (gridEnabled && xGrid) lines.push(`    x_grid: ${xGrid}`);
             if (gridEnabled && yGrid) lines.push(`    y_grid: ${yGrid}`);
 
+            // Traces section (required for ESPHome graph component)
+            // This defines the actual data line(s) to be drawn
+            lines.push(`    traces:`);
+            lines.push(`      - sensor: ${localSensorId}`);
+            // ALWAYS output line_thickness - ESPHome default is 1px which is invisible on e-paper
+            // Our designer default is 3px which provides good visibility
+            lines.push(`        line_thickness: ${lineThickness}`);
+            if (lineType !== "SOLID") {
+                lines.push(`        line_type: ${lineType}`);
+            }
+            if (continuous) {
+                lines.push(`        continuous: true`);
+            }
+
+            // Min/Max value configuration (required for Y-axis scaling)
+            // These go after traces in ESPHome YAML
+            const minValue = p.min_value;
+            const maxValue = p.max_value;
+            if (minValue !== undefined && minValue !== null && String(minValue).trim() !== "") {
+                lines.push(`    min_value: ${minValue}`);
+            }
+            if (maxValue !== undefined && maxValue !== null && String(maxValue).trim() !== "") {
+                lines.push(`    max_value: ${maxValue}`);
+            }
+
             // Range configuration
             if (maxRange !== null) lines.push(`    max_range: ${maxRange}`);
             if (minRange !== null) lines.push(`    min_range: ${minRange}`);
-
-            // Color is handled in lambda draw call
         });
         lines.push("");
     }
@@ -1605,6 +1638,7 @@ function generateSnippetLocally() {
                         const fill = p.fill;
                         const opacity = parseInt(p.opacity || 100, 10);
                         const isGray = colorProp.toLowerCase() === "gray";
+                        const rectY = w.y + RECT_Y_OFFSET;
 
                         lines.push(`        // widget:shape_rect id:${w.id} type:shape_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
 
@@ -1615,15 +1649,15 @@ function generateSnippetLocally() {
                                 lines.push(`        for (int dy = 0; dy < ${w.height}; dy++) {`);
                                 lines.push(`          for (int dx = 0; dx < ${w.width}; dx++) {`);
                                 lines.push(`            if ((dx + dy) % 2 == 0) {`);
-                                lines.push(`              it.draw_pixel_at(${w.x}+dx, ${w.y}+dy, COLOR_ON);`);
+                                lines.push(`              it.draw_pixel_at(${w.x}+dx, ${rectY}+dy, COLOR_ON);`);
                                 lines.push(`            }`);
                                 lines.push(`          }`);
                                 lines.push(`        }`);
                             } else {
-                                lines.push(`        it.filled_rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
+                                lines.push(`        it.filled_rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
                             }
                         } else {
-                            lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
+                            lines.push(`        it.rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
                             // TODO: Handle border width > 1 for non-filled rects if needed (by drawing multiple rects or using a helper)
                         }
 
@@ -2277,6 +2311,7 @@ function generateSnippetLocally() {
                         const color = getColorConst(colorProp);
                         const opacity = parseInt(p.opacity || 100, 10);
                         const isGray = colorProp.toLowerCase() === "gray";
+                        const rectY = w.y + RECT_Y_OFFSET;
                         lines.push(`        // widget:shape_rect id:${w.id} type:shape_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
                         if (fill) {
                             if (isGray) {
@@ -2285,19 +2320,19 @@ function generateSnippetLocally() {
                                 lines.push(`        for (int dy = 0; dy < ${w.height}; dy++) {`);
                                 lines.push(`          for (int dx = 0; dx < ${w.width}; dx++) {`);
                                 lines.push(`            if ((dx + dy) % 2 == 0) {`);
-                                lines.push(`              it.draw_pixel_at(${w.x}+dx, ${w.y}+dy, COLOR_ON);`);
+                                lines.push(`              it.draw_pixel_at(${w.x}+dx, ${rectY}+dy, COLOR_ON);`);
                                 lines.push(`            }`);
                                 lines.push(`          }`);
                                 lines.push(`        }`);
                             } else {
-                                lines.push(`        it.filled_rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
+                                lines.push(`        it.filled_rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
                             }
                         } else {
                             if (borderWidth <= 1) {
-                                lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
+                                lines.push(`        it.rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
                             } else {
                                 lines.push(`        for (int i=0; i<${borderWidth}; i++) {`);
-                                lines.push(`          it.rectangle(${w.x}+i, ${w.y}+i, ${w.width}-2*i, ${w.height}-2*i, ${color});`);
+                                lines.push(`          it.rectangle(${w.x}+i, ${rectY}+i, ${w.width}-2*i, ${w.height}-2*i, ${color});`);
                                 lines.push(`        }`);
                             }
                         }
@@ -2380,11 +2415,13 @@ function generateSnippetLocally() {
                         const url = p.url || "";
                         const invert = !!p.invert;
                         const renderMode = p.render_mode || "Auto";
+                        // Sanitize widget ID to match the online_image: component declaration
+                        const onlineImageId = `online_image_${w.id}`.replace(/-/g, "_");
                         lines.push(`        // widget:online_image id:${w.id} type:online_image x:${w.x} y:${w.y} w:${w.width} h:${w.height} url:"${url}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
                         if (invert) {
-                            lines.push(`        it.image(${w.x}, ${w.y}, id(online_image_${w.id}), COLOR_OFF, COLOR_ON);`);
+                            lines.push(`        it.image(${w.x}, ${w.y}, id(${onlineImageId}), COLOR_OFF, COLOR_ON);`);
                         } else {
-                            lines.push(`        it.image(${w.x}, ${w.y}, id(online_image_${w.id}));`);
+                            lines.push(`        it.image(${w.x}, ${w.y}, id(${onlineImageId}));`);
                         }
                     } else if (t === "puppet") {
                         const url = p.image_url || "";

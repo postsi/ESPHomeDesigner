@@ -2,6 +2,20 @@
 
 
 
+## v0.6.2 - Rendering Fixes
+
+**Release Date:** December 6, 2025
+
+### 🐛 Bug Fixes
+
+#### Rectangle Widget
+- **Y Offset Alignment**: Added `RECT_Y_OFFSET` constant (-15px) to align rectangle widget rendering on e-ink display with canvas preview
+
+#### Graph Widget
+- **Min/Max Value Regression**: Fixed regression where `min_value` and `max_value` were not being output to the graph component YAML declaration, causing graphs to display empty
+
+---
+
 ## v0.6.1
 
 ### 🐛 Bug Fixes
