@@ -2,6 +2,37 @@
 
 
 
+## v0.6.1
+
+### 🐛 Bug Fixes
+
+#### Quote/RSS Widget
+- **Quote & Author Swapped**: Fixed RSS parsing where quote text and author name were incorrectly swapped for BrainyQuote feeds
+- **Auto Text Scaling**: Added automatic font scaling for quotes - text now shrinks (100% → 75% → 50%) to fit within widget bounds
+
+#### YAML Generation
+- **Duplicate Layouts**: Fixed "Update Layout from YAML" creating duplicate layouts and resetting device model to E1001
+- **Cleaned Up HTTP Comments**: Removed confusing duplicate `http_request` comment block from generated YAML
+
+#### Display Rendering
+- **Text Vertical Alignment**: Added 11px vertical offset for text widgets to better match canvas preview with actual e-ink display positioning
+  - *Note: This adjustment compensates for font baseline differences between browser and ESPHome rendering*
+
+#### Graph Widget
+- **Grid Lines**: Fixed X and Y grid lines not generating correctly in YAML output
+
+### ✨ Improvements
+
+#### Online Image Widget
+- **Binary Mode for Monochrome**: Remote images now default to BINARY type for monochrome displays (E1001, TRMNL) for sharper rendering
+- **Auto Type Detection**: Image type automatically selected based on device (BINARY for monochrome, RGB565 for color E1002)
+
+#### Rounded Rectangle Widget
+- **New Widget**: Full support for rounded rectangles with configurable corner radius
+- **Border Support**: Optional border with customizable thickness
+
+---
+
 ## v0.6.0
 > [!NOTE]
 > This is a **major release** with significant architectural improvements, new widgets, and hardware support.

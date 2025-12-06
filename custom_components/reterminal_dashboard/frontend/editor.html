@@ -20,7 +20,7 @@
   <aside class="sidebar">
     <div>
       <h1><span class="logo-dot"></span> reTerminal Designer <span
-          style="font-size: 10px; color: var(--muted); vertical-align: middle;">v0.6</span></h1>
+          style="font-size: 10px; color: var(--muted); vertical-align: middle;">v0.6.1</span></h1>
       <div style="margin-top: 4px; font-size: 10px;">
         <a href="https://github.com/koosoli/ReTerminalDesigner" target="_blank"
           style="color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 4px;">
@@ -69,6 +69,12 @@
                 <rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
               </svg>
               <span class="label">Rectangle</span>
+            </div>
+            <div class="item" data-widget-type="rounded_rect">
+              <svg class="widget-icon" viewBox="0 0 24 24" width="18" height="18">
+                <rect x="3" y="5" width="18" height="14" rx="6" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span class="label">Rounded Rect</span>
             </div>
             <div class="item" data-widget-type="shape_circle">
               <svg class="widget-icon" viewBox="0 0 24 24" width="18" height="18">
@@ -647,6 +653,7 @@
   <script src="features/battery_icon/render.js"></script>
   <script src="features/weather_icon/render.js"></script>
   <script src="features/shape_rect/render.js"></script>
+  <script src="features/rounded_rect/render.js"></script>
   <script src="features/shape_circle/render.js"></script>
   <script src="features/line/render.js"></script>
   <script src="features/progress_bar/render.js"></script>

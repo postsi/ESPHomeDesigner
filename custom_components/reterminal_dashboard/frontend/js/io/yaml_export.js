@@ -451,6 +451,10 @@ function generateSnippetLocally() {
     const pagesLocal = pages;
     const lines = [];
 
+    // Global offset for text widgets to match device rendering
+    // Adjust this value if text appears misaligned on the e-ink display
+    const TEXT_Y_OFFSET = 0;
+
     // Helper to wrap widget rendering with conditional logic
     const wrapWithCondition = (lines, w, contentFn) => {
         const p = w.props || {};
@@ -611,7 +615,15 @@ function generateSnippetLocally() {
                 // Quote can be italic, author typically not
                 // Note: italic_quote defaults to true (matching lambda generation)
                 const italicQuote = p.italic_quote !== false;
-                addFont(p.font_family, p.font_weight, p.quote_font_size || 18, italicQuote);
+                const baseSize = parseInt(p.quote_font_size || 18, 10);
+                addFont(p.font_family, p.font_weight, baseSize, italicQuote);
+
+                // Add fallback fonts if auto-scale is enabled
+                if (p.auto_scale) {
+                    addFont(p.font_family, p.font_weight, Math.max(8, Math.floor(baseSize * 0.75)), italicQuote);
+                    addFont(p.font_family, p.font_weight, Math.max(8, Math.floor(baseSize * 0.50)), italicQuote);
+                }
+
                 if (p.show_author !== false) {
                     addFont(p.font_family, p.font_weight, p.author_font_size || 14, false);
                 }
@@ -914,12 +926,6 @@ function generateSnippetLocally() {
 
     // Generate online_image: component declarations
     if (onlineImageWidgets.length > 0) {
-        lines.push("# Required for Online Image / Puppet widgets (uncomment if not already present)");
-        lines.push("# http_request:");
-        lines.push("#   verify_ssl: false");
-        lines.push("#   timeout: 20s");
-        lines.push("");
-
         lines.push("online_image:");
         onlineImageWidgets.forEach(w => {
             const p = w.props || {};
@@ -946,8 +952,8 @@ function generateSnippetLocally() {
             } else if (renderMode === "Color (RGB565)") {
                 imgType = "RGB565";
             } else {
-                // Auto defaults
-                imgType = (getDeviceModel() === "reterminal_e1002") ? "RGB565" : "GRAYSCALE";
+                // Auto defaults: RGB565 for Color E1002, BINARY for Monochrome E1001/TRMNL
+                imgType = (getDeviceModel() === "reterminal_e1002") ? "RGB565" : "BINARY";
             }
 
             // Convert interval_s to ESPHome format (e.g., 100 -> "100s")
@@ -960,11 +966,16 @@ function generateSnippetLocally() {
             lines.push(`    url: "${url}"`);
             lines.push(`    format: ${format}`);
             lines.push(`    type: ${imgType}`);
-            lines.push(`    resize: ${w.width}x${w.height}`);
+
+            // Only add resize for non-BINARY types (User request: simpler memory usage)
+            if (imgType !== "BINARY") {
+                lines.push(`    resize: ${w.width}x${w.height}`);
+            }
+
             lines.push(`    update_interval: ${updateInterval}`);
 
-            // Add dithering for non-color modes
-            if (imgType === "BINARY" || imgType === "GRAYSCALE") {
+            // Add dithering ONLY for Grayscale (Binary usually assumes pre-dithered or threshold)
+            if (imgType === "GRAYSCALE") {
                 lines.push(`    dither: FLOYDSTEINBERG`);
             }
 
@@ -987,10 +998,60 @@ function generateSnippetLocally() {
             const duration = p.duration || "1h";
             const width = w.width;
             const height = w.height;
-            const xGrid = p.x_grid || "";
-            const yGrid = p.y_grid || "";
             const maxRange = p.max_range ? parseFloat(p.max_range) : null;
             const minRange = p.min_range ? parseFloat(p.min_range) : null;
+
+            // Grid settings: use explicit values or compute sensible defaults if grid is enabled
+            const gridEnabled = p.grid !== false; // "Show Grid" checkbox
+            let xGrid = p.x_grid || "";
+            let yGrid = p.y_grid || "";
+
+            // If grid is enabled but x_grid/y_grid are empty, compute defaults
+            if (gridEnabled) {
+                if (!xGrid) {
+                    // Parse duration and compute x_grid as duration/4
+                    // E.g., "24h" -> "6h", "1h" -> "15min", "30min" -> "7.5min" (round to "8min")
+                    const durationMatch = duration.match(/^(\d+(?:\.\d+)?)(min|h|d)$/);
+                    if (durationMatch) {
+                        const val = parseFloat(durationMatch[1]);
+                        const unit = durationMatch[2];
+                        let gridVal = val / 4;
+
+                        if (unit === "h") {
+                            if (gridVal >= 1) {
+                                xGrid = `${Math.round(gridVal)}h`;
+                            } else {
+                                xGrid = `${Math.round(gridVal * 60)}min`;
+                            }
+                        } else if (unit === "min") {
+                            xGrid = `${Math.round(gridVal)}min`;
+                        } else if (unit === "d") {
+                            xGrid = `${Math.round(gridVal * 24)}h`;
+                        }
+                    } else {
+                        xGrid = "1h"; // Fallback
+                    }
+                }
+
+                if (!yGrid) {
+                    // Calculate y_grid based on min/max value range
+                    const minVal = parseFloat(p.min_value) || 0;
+                    const maxVal = parseFloat(p.max_value) || 100;
+                    const range = maxVal - minVal;
+                    // Aim for ~4-5 grid lines
+                    const step = range / 4;
+                    // Round to nice values
+                    const niceStep = Math.pow(10, Math.floor(Math.log10(step)));
+                    const normalized = step / niceStep;
+                    let yGridVal;
+                    if (normalized <= 1) yGridVal = niceStep;
+                    else if (normalized <= 2) yGridVal = 2 * niceStep;
+                    else if (normalized <= 5) yGridVal = 5 * niceStep;
+                    else yGridVal = 10 * niceStep;
+
+                    yGrid = String(yGridVal);
+                }
+            }
 
             // Convert HA entity_id to safe ESPHome local sensor ID
             // e.g., "sensor.esp_wroom_temp" -> "esp_wroom_temp"
@@ -1003,9 +1064,9 @@ function generateSnippetLocally() {
             lines.push(`    width: ${width}`);
             lines.push(`    height: ${height}`);
 
-            // Optional grid configuration (handled in lambda, but good to document)
-            if (xGrid) lines.push(`    x_grid: ${xGrid}`);
-            if (yGrid) lines.push(`    y_grid: ${yGrid}`);
+            // Grid configuration (only output if grid is enabled)
+            if (gridEnabled && xGrid) lines.push(`    x_grid: ${xGrid}`);
+            if (gridEnabled && yGrid) lines.push(`    y_grid: ${yGrid}`);
 
             // Range configuration
             if (maxRange !== null) lines.push(`    max_range: ${maxRange}`);
@@ -1443,7 +1504,7 @@ function generateSnippetLocally() {
                         const italicSuffix = p.italic ? "_italic" : "";
                         const fontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${fontSize}${italicSuffix}`;
                         usedFontIds.add(fontId);
-                        lines.push(`        it.printf(${alignX}, ${w.y}, id(${fontId}), ${color}, TextAlign::${textAlign}, "${txt}");`);
+                        lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${fontId}), ${color}, TextAlign::${textAlign}, "${txt}");`);
                     } else if (t === "sensor_text") {
                         const entityId = (w.entity_id || "").trim();
                         const label = (w.title || "").replace(/"/g, '\\"');
@@ -1491,26 +1552,26 @@ function generateSnippetLocally() {
 
                         // Generate output based on value format
                         if (label && valueFormat === "label_value") {
-                            lines.push(`        it.printf(${alignX}, ${w.y}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
+                            lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
                             if (isTextEntity) {
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
                             } else {
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
                             }
                         } else if (valueFormat === "label_newline_value") {
                             // Label on one line, value on next
-                            lines.push(`        it.printf(${alignX}, ${w.y}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
+                            lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
                             if (isTextEntity) {
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
                             } else {
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
                             }
                         } else {
                             // Just value (value_only or fallback)
                             if (isTextEntity) {
-                                lines.push(`        it.printf(${alignX}, ${w.y}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
                             } else {
-                                lines.push(`        it.printf(${alignX}, ${w.y}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
                             }
                         }
 
@@ -1615,8 +1676,6 @@ function generateSnippetLocally() {
                         const borderEnabled = p.border !== false;
                         const colorProp = p.color || "black";
                         const color = getColorConst(colorProp);
-                        const xGrid = p.x_grid || "";
-                        const yGrid = p.y_grid || "";
                         const lineType = p.line_type || "SOLID";
                         const lineThickness = parseInt(p.line_thickness || 3, 10);
                         const continuous = !!p.continuous;
@@ -1627,11 +1686,60 @@ function generateSnippetLocally() {
                         const safeId = `graph_${w.id}`.replace(/-/g, "_");
                         usedFontIds.add("font_roboto_400_12"); // Graph uses small font for labels
 
+                        // Grid settings: use explicit values or compute sensible defaults if grid is enabled
+                        const gridEnabled = p.grid !== false;
+                        let xGrid = p.x_grid || "";
+                        let yGrid = p.y_grid || "";
+
+                        // If grid is enabled but x_grid/y_grid are empty, compute defaults
+                        if (gridEnabled) {
+                            if (!xGrid) {
+                                // Parse duration
+                                const durationMatch = duration.match(/^(\d+(?:\.\d+)?)(min|h|d)$/);
+                                if (durationMatch) {
+                                    const val = parseFloat(durationMatch[1]);
+                                    const unit = durationMatch[2];
+                                    let gridVal = val / 4;
+                                    if (unit === "h") {
+                                        if (gridVal >= 1) xGrid = `${Math.round(gridVal)}h`;
+                                        else xGrid = `${Math.round(gridVal * 60)}min`;
+                                    } else if (unit === "min") {
+                                        xGrid = `${Math.round(gridVal)}min`;
+                                    } else if (unit === "d") {
+                                        xGrid = `${Math.round(gridVal * 24)}h`;
+                                    }
+                                } else {
+                                    xGrid = "1h"; // Fallback
+                                }
+                            }
+
+                            if (!yGrid) {
+                                // Calculate y_grid based on min/max value range
+                                const minVal = parseFloat(minValue) || 0;
+                                const maxVal = parseFloat(maxValue) || 100;
+                                const range = maxVal - minVal;
+                                const step = range / 4;
+                                const niceStep = Math.pow(10, Math.floor(Math.log10(step)));
+                                const normalized = step / niceStep;
+                                let yGridVal;
+                                if (normalized <= 1) yGridVal = niceStep;
+                                else if (normalized <= 2) yGridVal = 2 * niceStep;
+                                else if (normalized <= 5) yGridVal = 5 * niceStep;
+                                else yGridVal = 10 * niceStep;
+                                yGrid = String(yGridVal);
+                            }
+                        }
+
                         lines.push(`        // widget:graph id:${w.id} type:graph x:${w.x} y:${w.y} w:${w.width} h:${w.height} title:"${title}" entity:${entityId} local:${!!p.is_local_sensor} duration:${duration} border:${borderEnabled} color:${colorProp} x_grid:${xGrid} y_grid:${yGrid} line_type:${lineType} line_thickness:${lineThickness} continuous:${continuous} min_value:${minValue} max_value:${maxValue} min_range:${minRange} max_range:${maxRange} ${getCondProps(w)}`);
 
                         if (entityId) {
                             // Pass color as 4th parameter to set border/grid color (required for e-paper)
                             lines.push(`        it.graph(${w.x}, ${w.y}, id(${safeId}), ${color});`);
+
+                            // Draw Border if enabled
+                            if (borderEnabled) {
+                                lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
+                            }
 
                             // Draw Grid Lines if configured
                             // Note: ESPHome graph component doesn't draw grid lines automatically on e-paper
@@ -1639,15 +1747,13 @@ function generateSnippetLocally() {
 
                             // Y-Grid (Horizontal lines)
                             if (yGrid) {
-                                // Parse y_grid (e.g. "10" or "auto") - simplified logic for now
                                 // Drawing 4 horizontal grid lines as a default if enabled
                                 const ySteps = 4;
                                 for (let i = 1; i < ySteps; i++) {
                                     const yOffset = Math.round(w.height * (i / ySteps));
-                                    // Draw dotted line for grid
-                                    for (let dx = 0; dx < w.width; dx += 4) {
-                                        lines.push(`        it.draw_pixel_at(${w.x + dx}, ${w.y + yOffset}, ${color});`);
-                                    }
+                                    lines.push(`        for (int i = 0; i < ${w.width}; i += 4) {`);
+                                    lines.push(`          it.draw_pixel_at(${w.x} + i, ${w.y + yOffset}, ${color});`);
+                                    lines.push(`        }`);
                                 }
                             }
 
@@ -1657,13 +1763,11 @@ function generateSnippetLocally() {
                                 const xSteps = 4;
                                 for (let i = 1; i < xSteps; i++) {
                                     const xOffset = Math.round(w.width * (i / xSteps));
-                                    // Draw dotted line for grid
-                                    for (let dy = 0; dy < w.height; dy += 4) {
-                                        lines.push(`        it.draw_pixel_at(${w.x + xOffset}, ${w.y + dy}, ${color});`);
-                                    }
+                                    lines.push(`        for (int i = 0; i < ${w.height}; i += 4) {`);
+                                    lines.push(`          it.draw_pixel_at(${w.x + xOffset}, ${w.y} + i, ${color});`);
+                                    lines.push(`        }`);
                                 }
                             }
-
                             if (title) {
                                 lines.push(`        it.printf(${w.x}+4, ${w.y}+2, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
                             }
@@ -1857,92 +1961,118 @@ function generateSnippetLocally() {
                         const italicQuote = p.italic_quote !== false;
                         const refreshInterval = p.refresh_interval || "1h";
                         const randomQuote = p.random !== false;
+                        const autoScale = p.auto_scale || false;
 
-                        // Register fonts for this widget
-                        addFont(fontFamily, fontWeight, quoteFontSize, italicQuote);
+                        // Font sizes for auto-scale (100%, 75%, 50%)
+                        const size1 = quoteFontSize;
+                        const size2 = Math.max(8, Math.floor(size1 * 0.75));
+                        const size3 = Math.max(8, Math.floor(size1 * 0.50));
+
+                        // Register fonts
+                        addFont(fontFamily, fontWeight, size1, italicQuote);
+                        if (autoScale) {
+                            addFont(fontFamily, fontWeight, size2, italicQuote);
+                            addFont(fontFamily, fontWeight, size3, italicQuote);
+                        }
                         if (showAuthor) {
                             addFont(fontFamily, fontWeight, authorFontSize, false);
                         }
 
-                        // Generate safe font IDs (with italic suffix for quote if enabled)
-                        const safeFontFamily = fontFamily.replace(/\s+/g, "_").toLowerCase();
+                        // Generate font IDs
+                        const safeFamily = fontFamily.replace(/\s+/g, "_").toLowerCase();
                         const quoteItalicSuffix = italicQuote ? "_italic" : "";
-                        const quoteFontId = `font_${safeFontFamily}_${fontWeight}_${quoteFontSize}${quoteItalicSuffix}`;
-                        const authorFontId = `font_${safeFontFamily}_${fontWeight}_${authorFontSize}`;
+                        const getQId = (s) => `font_${safeFamily}_${fontWeight}_${s}${quoteItalicSuffix}`;
+                        const quoteFontId1 = getQId(size1);
+                        const quoteFontId2 = getQId(size2);
+                        const quoteFontId3 = getQId(size3);
+                        const authorFontId = `font_${safeFamily}_${fontWeight}_${authorFontSize}`;
 
-                        // Generate text_sensor IDs
+                        // Sensor IDs
                         const quoteTextId = `quote_text_${w.id}`.replace(/-/g, "_");
                         const quoteAuthorId = `quote_author_${w.id}`.replace(/-/g, "_");
-
-                        // Calculate text positions
                         const alignX = getAlignX(textAlign, w.x, w.width);
                         const alignY = getAlignY(textAlign, w.y, w.height);
                         const espAlign = `TextAlign::${textAlign}`;
 
-                        lines.push(`        // widget:quote_rss id:${w.id} type:quote_rss x:${w.x} y:${w.y} w:${w.width} h:${w.height} feed_url:"${feedUrl}" show_author:${showAuthor} quote_font_size:${quoteFontSize} author_font_size:${authorFontSize} font_family:"${fontFamily}" weight:${fontWeight} color:${colorProp} align:${textAlign} word_wrap:${wordWrap} italic_quote:${italicQuote} refresh_interval:${refreshInterval} random:${randomQuote} ${getCondProps(w)}`);
+                        lines.push(`        // widget:quote_rss id:${w.id} type:quote_rss x:${w.x} y:${w.y} w:${w.width} h:${w.height} feed_url:"${feedUrl}" show_author:${showAuthor} quote_font_size:${quoteFontSize} author_font_size:${authorFontSize} font_family:"${fontFamily}" weight:${fontWeight} color:${colorProp} align:${textAlign} word_wrap:${wordWrap} italic_quote:${italicQuote} refresh_interval:${refreshInterval} random:${randomQuote} auto_scale:${autoScale} ${getCondProps(w)}`);
                         lines.push(`        {`);
                         lines.push(`          std::string quote_text = id(${quoteTextId}_global);`);
                         if (showAuthor) {
                             lines.push(`          std::string quote_author = id(${quoteAuthorId}_global);`);
                         }
-
                         lines.push(``);
 
                         if (wordWrap) {
-                            // Word wrapping logic
-                            const lineHeight = Math.ceil(quoteFontSize * 1.3);
-                            const maxWidth = w.width - 16; // 8px padding on each side
-
-                            lines.push(`          // Word-wrap the quote text using font measurement`);
+                            const maxWidth = w.width - 16;
                             lines.push(`          int max_width = ${maxWidth};`);
-                            lines.push(`          int line_height = ${lineHeight};`);
-                            lines.push(`          int y_pos = ${w.y + 8};`);
+                            lines.push(`          int y_start = ${w.y + 8};`);
                             lines.push(`          int x_pos = ${w.x + 8};`);
-                            lines.push(``);
-                            lines.push(`          // Add opening quote mark`);
+                            lines.push(`          int max_height = ${w.height - 16 - (showAuthor ? (authorFontSize + 8) : 0)};`);
                             lines.push(`          std::string display_text = "\\"" + quote_text + "\\"";`);
-                            lines.push(``);
-                            lines.push(`          // Word wrap using font measurement for accurate widths`);
-                            lines.push(`          std::string current_line = "";`);
-                            lines.push(`          size_t pos = 0;`);
-                            lines.push(`          size_t space_pos;`);
-                            lines.push(`          while ((space_pos = display_text.find(' ', pos)) != std::string::npos) {`);
-                            lines.push(`            std::string word = display_text.substr(pos, space_pos - pos);`);
-                            lines.push(`            std::string test_line = current_line.empty() ? word : current_line + " " + word;`);
-                            lines.push(`            // Use font measurement for accurate width`);
-                            lines.push(`            int text_width, x_offset, baseline, text_height;`);
-                            lines.push(`            id(${quoteFontId}).measure(test_line.c_str(), &text_width, &x_offset, &baseline, &text_height);`);
-                            lines.push(`            if (text_width > max_width && !current_line.empty()) {`);
-                            lines.push(`              it.printf(x_pos, y_pos, id(${quoteFontId}), ${color}, "%s", current_line.c_str());`);
-                            lines.push(`              y_pos += line_height;`);
-                            lines.push(`              current_line = word;`);
-                            lines.push(`            } else {`);
-                            lines.push(`              current_line = test_line;`);
+
+                            // Define C++ lambda for printing/measuring
+                            lines.push(`          auto print_quote = [&](esphome::font::Font *font, int line_h, bool draw) -> int {`);
+                            lines.push(`            int y_curr = y_start;`);
+                            lines.push(`            std::string current_line = "";`);
+                            lines.push(`            size_t pos = 0;`);
+                            lines.push(`            size_t space_pos;`);
+                            lines.push(`            while ((space_pos = display_text.find(' ', pos)) != std::string::npos) {`);
+                            lines.push(`                std::string word = display_text.substr(pos, space_pos - pos);`);
+                            lines.push(`                std::string test_line = current_line.empty() ? word : current_line + " " + word;`);
+                            lines.push(`                int w, h, xoff, bl;`);
+                            lines.push(`                font->measure(test_line.c_str(), &w, &xoff, &bl, &h);`);
+                            lines.push(`                if (w > max_width && !current_line.empty()) {`);
+                            lines.push(`                    if (draw) it.printf(x_pos, y_curr, font, ${color}, "%s", current_line.c_str());`);
+                            lines.push(`                    y_curr += line_h;`);
+                            lines.push(`                    current_line = word;`);
+                            lines.push(`                } else {`);
+                            lines.push(`                    current_line = test_line;`);
+                            lines.push(`                }`);
+                            lines.push(`                pos = space_pos + 1;`);
                             lines.push(`            }`);
-                            lines.push(`            pos = space_pos + 1;`);
-                            lines.push(`          }`);
-                            lines.push(`          // Add remaining text`);
-                            lines.push(`          if (pos < display_text.length()) {`);
-                            lines.push(`            std::string remaining = display_text.substr(pos);`);
-                            lines.push(`            if (!current_line.empty()) current_line += " ";`);
-                            lines.push(`            current_line += remaining;`);
-                            lines.push(`          }`);
-                            lines.push(`          if (!current_line.empty()) {`);
-                            lines.push(`            it.printf(x_pos, y_pos, id(${quoteFontId}), ${color}, "%s", current_line.c_str());`);
-                            lines.push(`            y_pos += line_height;`);
-                            lines.push(`          }`);
+                            lines.push(`            if (!current_line.empty()) {`);
+                            lines.push(`                std::string rem = display_text.substr(pos);`);
+                            lines.push(`                if (!current_line.empty()) current_line += " ";`);
+                            lines.push(`                current_line += rem;`);
+                            lines.push(`            }`);
+                            lines.push(`            if (!current_line.empty()) {`);
+                            lines.push(`                if (draw) it.printf(x_pos, y_curr, font, ${color}, "%s", current_line.c_str());`);
+                            lines.push(`                y_curr += line_h;`);
+                            lines.push(`            }`);
+                            lines.push(`            return y_curr - y_start;`);
+                            lines.push(`          };`);
+
+                            // Selection logic
+                            lines.push(``);
+                            if (autoScale) {
+                                lines.push(`          // Auto-scale logic`);
+                                lines.push(`          esphome::font::Font *selected_font = id(${quoteFontId1});`);
+                                lines.push(`          int lh = ${Math.ceil(size1 * 1.3)};`);
+                                lines.push(`          if (print_quote(selected_font, lh, false) > max_height) {`);
+                                lines.push(`              selected_font = id(${quoteFontId2});`);
+                                lines.push(`              lh = ${Math.ceil(size2 * 1.3)};`);
+                                lines.push(`              if (print_quote(selected_font, lh, false) > max_height) {`);
+                                lines.push(`                  selected_font = id(${quoteFontId3});`);
+                                lines.push(`                  lh = ${Math.ceil(size3 * 1.3)};`);
+                                lines.push(`              }`);
+                                lines.push(`          }`);
+                                lines.push(`          int final_h = print_quote(selected_font, lh, true);`);
+                            } else {
+                                lines.push(`          int final_h = print_quote(id(${quoteFontId1}), ${Math.ceil(size1 * 1.3)}, true);`);
+                            }
 
                             if (showAuthor) {
                                 lines.push(``);
                                 lines.push(`          // Draw author below quote`);
                                 lines.push(`          if (!quote_author.empty()) {`);
-                                lines.push(`            y_pos += 4; // Small gap`);
-                                lines.push(`            it.printf(x_pos, y_pos, id(${authorFontId}), ${color}, "— %s", quote_author.c_str());`);
+                                lines.push(`            int author_y = y_start + final_h + 4;`);
+                                lines.push(`            it.printf(x_pos, author_y, id(${authorFontId}), ${color}, "— %s", quote_author.c_str());`);
                                 lines.push(`          }`);
                             }
+
                         } else {
                             // No word wrap - simple single line
-                            lines.push(`          it.printf(${alignX}, ${alignY}, id(${quoteFontId}), ${color}, ${espAlign}, "\\"%s\\"", quote_text.c_str());`);
+                            lines.push(`          it.printf(${alignX}, ${alignY}, id(${quoteFontId1}), ${color}, ${espAlign}, "\\"%s\\"", quote_text.c_str());`);
                             if (showAuthor) {
                                 lines.push(`          if (!quote_author.empty()) {`);
                                 lines.push(`            it.printf(${alignX}, ${alignY + quoteFontSize + 4}, id(${authorFontId}), ${color}, ${espAlign}, "— %s", quote_author.c_str());`);
@@ -2043,6 +2173,103 @@ function generateSnippetLocally() {
                             lines.push(`          }`);
                         }
                         lines.push(`        }`);
+                    } else if (t === "rounded_rect") {
+                        const fill = !!p.fill;
+                        // Default show_border to true if not explicitly false
+                        const showBorder = p.show_border !== false;
+                        const r = parseInt(p.radius || 10, 10);
+                        const thickness = parseInt(p.border_width || 4, 10);
+                        const colorProp = p.color || "black";
+                        const color = getColorConst(colorProp);
+                        const isGray = colorProp.toLowerCase() === "gray";
+
+                        // Limit radius to half geometric size
+                        lines.push(`        // widget:rounded_rect id:${w.id} type:rounded_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} show_border:${showBorder} border:${thickness} radius:${r} color:${colorProp} ${getCondProps(w)}`);
+                        lines.push(`        {`);
+                        lines.push(`          int r = ${r};`);
+                        lines.push(`          int w = ${w.width};`);
+                        lines.push(`          int h = ${w.height};`);
+                        lines.push(`          if (r > w/2) r = w/2;`);
+                        lines.push(`          if (r > h/2) r = h/2;`);
+                        lines.push(``);
+                        lines.push(`          auto draw_rrect = [&](int x, int y, int w, int h, int r, auto c) {`);
+                        lines.push(`            // Center vertical strip`);
+                        lines.push(`            it.filled_rectangle(x + r, y, w - 2 * r, h, c);`);
+                        lines.push(`            // Left side (between corners)`);
+                        lines.push(`            it.filled_rectangle(x, y + r, r, h - 2 * r, c);`);
+                        lines.push(`            // Right side (between corners)`);
+                        lines.push(`            it.filled_rectangle(x + w - r, y + r, r, h - 2 * r, c);`);
+                        lines.push(`            // Corners`);
+                        lines.push(`            it.filled_circle(x + r, y + r, r, c);`);
+                        lines.push(`            it.filled_circle(x + w - r, y + r, r, c);`);
+                        lines.push(`            it.filled_circle(x + r, y + h - r, r, c);`);
+                        lines.push(`            it.filled_circle(x + w - r, y + h - r, r, c);`);
+                        lines.push(`          };`);
+                        lines.push(``); // Blank line
+
+                        if (fill) {
+                            let fx = w.x, fy = w.y, fw = w.width, fh = w.height, fr = r;
+
+                            if (showBorder) {
+                                lines.push(`          // Draw Black Border (Outer)`);
+                                lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, COLOR_ON);`);
+
+                                // Shrink for fill
+                                const t = thickness;
+                                fx += t; fy += t; fw -= 2 * t; fh -= 2 * t; fr -= t;
+                                if (fr < 0) fr = 0;
+
+                                if (isGray && fw > 0 && fh > 0) {
+                                    lines.push(`          // Clear inner for dithering`);
+                                    lines.push(`          draw_rrect(${fx}, ${fy}, ${fw}, ${fh}, ${fr}, COLOR_OFF);`);
+                                }
+                            }
+
+                            if (isGray) {
+                                lines.push(`          // Gray fill using 50% checkerboard dithering`);
+                                // Need to perform loop on adjusted coordinates
+                                // If showBorder, the indices change.
+                                // C++ Code generation:
+                                lines.push(`          int fx = ${fx}; int fy = ${fy}; int fw = ${fw}; int fh = ${fh}; int fr = ${fr};`); // Use interpolated JS values
+                                lines.push(`          if (fw > 0 && fh > 0) {`);
+                                lines.push(`            for (int dy = 0; dy < fh; dy++) {`);
+                                lines.push(`              for (int dx = 0; dx < fw; dx++) {`);
+                                lines.push(`                if ((fx + dx + fy + dy) % 2 != 0) continue;`); // Global dithering alignment
+                                lines.push(`                bool inside = false;`);
+                                lines.push(`                if ((dx >= fr && dx < fw - fr) || (dy >= fr && dy < fh - fr)) {`);
+                                lines.push(`                  inside = true;`);
+                                lines.push(`                } else {`);
+                                lines.push(`                  int cx = (dx < fr) ? fr : fw - fr;`);
+                                lines.push(`                  int cy = (dy < fr) ? fr : fh - fr;`);
+                                lines.push(`                  if ((dx - cx)*(dx - cx) + (dy - cy)*(dy - cy) < fr*fr) inside = true;`);
+                                lines.push(`                }`);
+                                lines.push(`                if (inside) it.draw_pixel_at(fx + dx, fy + dy, COLOR_ON);`);
+                                lines.push(`              }`);
+                                lines.push(`            }`);
+                                lines.push(`          }`);
+                            } else {
+                                // Solid Color Fill
+                                lines.push(`          // Fill Inner`);
+                                if (showBorder) {
+                                    // Use interpolated values
+                                    lines.push(`          if (${fw} > 0 && ${fh} > 0) draw_rrect(${fx}, ${fy}, ${fw}, ${fh}, ${fr}, ${color});`);
+                                } else {
+                                    // No border, just draw full
+                                    lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, ${color});`);
+                                }
+                            }
+                        } else {
+                            // Outline Mode
+                            lines.push(`          // Draw Outer`);
+                            lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, ${color});`);
+                            lines.push(`          // Erase center to create outline`);
+                            lines.push(`          int t = ${thickness};`);
+                            lines.push(`          int ir = r - t; if (ir < 0) ir = 0;`);
+                            lines.push(`          draw_rrect(${w.x} + t, ${w.y} + t, w - 2*t, h - 2*t, ir, COLOR_OFF);`);
+                        }
+
+                        lines.push(`        }`);
+
                     } else if (t === "shape_rect") {
                         const fill = !!p.fill;
                         const borderWidth = parseInt(p.border_width || 1, 10);
@@ -2127,12 +2354,12 @@ function generateSnippetLocally() {
                         lines.push(`        auto now = id(ha_time).now();`);
                         const cx = w.x + Math.floor(w.width / 2);
                         if (format === "time_only") {
-                            lines.push(`        it.strftime(${cx}, ${w.y}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
+                            lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
                         } else if (format === "date_only") {
-                            lines.push(`        it.strftime(${cx}, ${w.y}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
+                            lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
                         } else {
-                            lines.push(`        it.strftime(${cx}, ${w.y}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
-                            lines.push(`        it.strftime(${cx}, ${w.y} + ${timeSize} + 4, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
+                            lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
+                            lines.push(`        it.strftime(${cx}, ${w.y} + ${timeSize} + 4 + ${TEXT_Y_OFFSET}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
                         }
                     } else if (t === "image") {
                         const path = (p.path || "").trim();

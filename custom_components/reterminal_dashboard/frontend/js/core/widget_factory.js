@@ -133,6 +133,18 @@ class WidgetFactory {
                 };
                 break;
 
+            case "rounded_rect":
+                widget.width = 100;
+                widget.height = 80;
+                widget.props = {
+                    radius: 10,
+                    border_width: 4,
+                    fill: false,
+                    color: "black",
+                    opacity: 100
+                };
+                break;
+
             case "shape_circle":
                 widget.width = 40;
                 widget.height = 40;

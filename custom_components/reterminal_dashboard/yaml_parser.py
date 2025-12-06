@@ -95,6 +95,9 @@ class ParsedWidget:
     opacity: int | None = None
     border_width: int | None = None
     stroke_width: int | None = None
+    # Rounded rect specific properties
+    radius: int | None = None
+    show_border: bool | None = None
     # Icon/Battery properties
     size: int | None = None
     # Progress bar properties
@@ -260,6 +263,10 @@ def yaml_to_layout(snippet: str) -> DeviceConfig:
             if pw.opacity is not None: props["opacity"] = pw.opacity
             if pw.border_width is not None: props["border_width"] = pw.border_width
             if pw.stroke_width is not None: props["stroke_width"] = pw.stroke_width
+            
+            # Rounded rect specific properties
+            if pw.radius is not None: props["radius"] = pw.radius
+            if pw.show_border is not None: props["show_border"] = pw.show_border
             
             # Icon/Battery properties
             if pw.size is not None: props["size"] = pw.size
@@ -616,6 +623,9 @@ def _parse_widget_line(line: str) -> ParsedWidget | None:
         value_align = meta.get("value_align")
         
         fill = parse_bool(meta.get("fill"))
+        # Rounded rect specific: show_border defaults to True when fill is enabled
+        show_border = parse_bool(meta.get("show_border"))
+        radius = parse_int(meta.get("radius"))
         show_label = parse_bool(meta.get("show_label"))
         show_percentage = parse_bool(meta.get("show_percentage")) or parse_bool(meta.get("show_pct"))
         is_local_sensor = parse_bool(meta.get("local"))
@@ -693,6 +703,8 @@ def _parse_widget_line(line: str) -> ParsedWidget | None:
             opacity=opacity,
             border_width=border_width,
             stroke_width=stroke_width,
+            radius=radius,
+            show_border=show_border,
             size=size,
             bar_height=bar_height,
             show_label=show_label,

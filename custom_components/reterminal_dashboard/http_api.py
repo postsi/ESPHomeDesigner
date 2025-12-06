@@ -737,26 +737,35 @@ class ReTerminalRssProxyView(HomeAssistantView):
                 description = item.find("description")
                 
                 # Extract quote and author
-                # BrainyQuote format: title contains quote, description may have author
-                quote_text = title.text if title is not None and title.text else ""
+                # BrainyQuote format: title contains AUTHOR, description contains QUOTE
+                title_text = title.text.strip() if title is not None and title.text else ""
+                desc_text = description.text.strip() if description is not None and description.text else ""
+                
+                quote_text = ""
                 author = ""
                 
-                # Try to extract author from description or dc:creator
+                # Try to extract author from dc:creator first
                 creator = item.find("{http://purl.org/dc/elements/1.1/}creator")
                 if creator is not None and creator.text:
-                    author = creator.text
-                elif description is not None and description.text:
-                    # Sometimes author is in description
-                    desc = description.text.strip()
-                    if desc and not desc.startswith("<"):
-                        author = desc
+                    author = creator.text.strip()
                 
-                # Clean up quote text (remove trailing " - Author" pattern if present)
-                if " - " in quote_text and not author:
-                    parts = quote_text.rsplit(" - ", 1)
-                    if len(parts) == 2:
-                        quote_text = parts[0].strip()
-                        author = parts[1].strip()
+                # BrainyQuote: title = author name, description = quote text
+                # Check if description looks like a quote (has quotes or is longer text)
+                if desc_text and not desc_text.startswith("<"):
+                    # Description has the quote, title has the author
+                    quote_text = desc_text
+                    if not author:
+                        author = title_text
+                elif title_text:
+                    # Fallback: title might contain "Quote - Author" format
+                    if " - " in title_text:
+                        parts = title_text.rsplit(" - ", 1)
+                        if len(parts) == 2:
+                            quote_text = parts[0].strip()
+                            if not author:
+                                author = parts[1].strip()
+                    else:
+                        quote_text = title_text
                 
                 # Strip URLs from quote text
                 import re

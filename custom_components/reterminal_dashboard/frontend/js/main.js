@@ -345,21 +345,32 @@ class App {
         if (!yaml.trim()) return;
 
         try {
-            let layout;
+            // IMPORTANT: "Update Layout from YAML" should update the CURRENT layout,
+            // not create a new one. We use the offline parser to extract pages/widgets,
+            // then preserve the current layout's identity (ID, name, device model).
+            
+            // Preserve current layout context BEFORE parsing
+            const currentLayoutId = window.AppState?.currentLayoutId || "reterminal_e1001";
+            const currentDeviceName = window.AppState?.deviceName || "Layout 1";
+            const currentDeviceModel = window.AppState?.deviceModel || window.AppState?.settings?.device_model || "reterminal_e1001";
+            
+            console.log(`[handleUpdateLayoutFromSnippetBox] Preserving context - ID: ${currentLayoutId}, Name: ${currentDeviceName}, Model: ${currentDeviceModel}`);
 
-            // Try backend import first if available
-            if (hasHaBackend()) {
-                try {
-                    layout = await importSnippetBackend(yaml);
-                } catch (backendErr) {
-                    console.warn("Backend import failed, falling back to offline parser:", backendErr);
-                    // Fallback to offline parser
-                    layout = parseSnippetYamlOffline(yaml);
-                    showToast("Backend unavailable, using offline parser", "warning");
-                }
-            } else {
-                layout = parseSnippetYamlOffline(yaml);
+            // Always use offline parser for "Update" operation
+            // This extracts pages/widgets from YAML without creating a new layout on the backend
+            let layout = parseSnippetYamlOffline(yaml);
+
+            // Preserve the current layout's identity - don't let the parser override these
+            layout.device_id = currentLayoutId;
+            layout.name = currentDeviceName;
+            layout.device_model = currentDeviceModel;
+            
+            // Also ensure settings preserve the device model
+            if (!layout.settings) {
+                layout.settings = {};
             }
+            layout.settings.device_model = currentDeviceModel;
+            layout.settings.device_name = currentDeviceName;
 
             // Suppress auto-update to prevent overwriting the user's manual edits
             // because the parser is lossy and will regenerate clean YAML, losing comments/custom code
@@ -381,11 +392,11 @@ class App {
 
             showToast("Layout updated from YAML", "success");
 
-            // Warn about C++ code if not using backend
-            if (!hasHaBackend() && (yaml.includes("lambda:") || yaml.includes("script:"))) {
+            // Warn about C++ code
+            if (yaml.includes("lambda:") || yaml.includes("script:")) {
                 setTimeout(() => {
-                    showToast("Warning: Custom C++ (lambda/script) cannot be fully previewed offline.", "warning", 5000);
-                }, 1000);
+                    showToast("Note: Custom C++ (lambda/script) may not fully preview.", "warning", 4000);
+                }, 800);
             }
 
         } catch (err) {

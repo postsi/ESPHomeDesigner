@@ -277,6 +277,16 @@ function parseSnippetYamlOffline(yamlText) {
                         color: p.color || "black",
                         opacity: parseInt(p.opacity || 100, 10)
                     };
+                } else if (p.type === "rounded_rect") {
+                    widget.props = {
+                        fill: (p.fill === "true" || p.fill === "1"),
+                        // Robustly parse show_border, defaulting to true if not explicitly false
+                        show_border: (p.show_border !== "false" && p.show_border !== "0"),
+                        border_width: parseInt(p.border || 4, 10),
+                        radius: parseInt(p.radius || 10, 10),
+                        color: p.color || "black",
+                        opacity: parseInt(p.opacity || 100, 10)
+                    };
                 } else if (p.type === "shape_circle") {
                     widget.props = {
                         fill: (p.fill === "true" || p.fill === "1"),

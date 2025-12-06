@@ -121,6 +121,15 @@ class PropertiesPanel {
             this.addLabeledInput("Border Width", "number", props.border_width || 1, (v) => updateProp("border_width", parseInt(v, 10)));
             this.addSelect("Color", props.color || "black", colors, (v) => updateProp("color", v));
         }
+        else if (type === "rounded_rect") {
+            this.addCheckbox("Fill", props.fill || false, (v) => updateProp("fill", v));
+            if (props.fill) {
+                this.addCheckbox("Show Border", props.show_border || false, (v) => updateProp("show_border", v));
+            }
+            this.addLabeledInput("Border Width", "number", props.border_width || 4, (v) => updateProp("border_width", parseInt(v, 10)));
+            this.addLabeledInput("Corner Radius", "number", props.radius || 10, (v) => updateProp("radius", parseInt(v, 10)));
+            this.addSelect("Color", props.color || "black", colors, (v) => updateProp("color", v));
+        }
         else if (type === "line") {
             this.addSelect("Orientation", props.orientation || "horizontal", ["horizontal", "vertical"], (v) => {
                 const strokeWidth = parseInt(props.stroke_width || 3, 10);
@@ -642,6 +651,8 @@ class PropertiesPanel {
             this.addSectionLabel("Display Options");
 
             this.addCheckbox("Word Wrap", props.word_wrap !== false, (v) => updateProp("word_wrap", v));
+            this.addCheckbox("Auto Scale Text", props.auto_scale || false, (v) => updateProp("auto_scale", v));
+            this.addHint("Automatically reduce font size if text is too long");
             this.addCheckbox("Italic Quote", props.italic_quote !== false, (v) => updateProp("italic_quote", v));
         }
         else if (type === "puppet") {
