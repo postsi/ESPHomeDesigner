@@ -36,6 +36,20 @@
             dateEl.style.color = colorStyle;
             dateEl.textContent = dateStr;
             el.appendChild(dateEl);
+        } else if (format === "weekday_day_month") {
+            const dateEl = document.createElement("div");
+            dateEl.style.fontSize = `${dateFontSize}px`;
+            dateEl.style.fontStyle = fontStyle;
+            dateEl.style.fontFamily = fontFamily;
+            dateEl.style.color = colorStyle;
+
+            // "Monday 08 December" format
+            const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+            const dayNum = String(now.getDate()).padStart(2, '0');
+            const monthName = now.toLocaleDateString('en-US', { month: 'long' });
+            dateEl.textContent = `${dayName} ${dayNum} ${monthName}`;
+
+            el.appendChild(dateEl);
         } else {
             const timeEl = document.createElement("div");
             timeEl.style.fontSize = `${timeFontSize}px`;

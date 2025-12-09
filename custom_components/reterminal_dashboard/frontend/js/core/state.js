@@ -239,8 +239,30 @@ class StateStore {
         if (this.state.clipboardWidget) {
             const newWidget = deepClone(this.state.clipboardWidget);
             newWidget.id = "w_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+            // Initial offset
             newWidget.x += 20;
             newWidget.y += 20;
+
+            // Smart Cascade: Prevent exact overlap with existing widgets
+            const page = this.getCurrentPage();
+            let attempts = 0;
+            const maxAttempts = 50;
+
+            while (attempts < maxAttempts) {
+                // Check for intersection with any existing widget (using a small threshold for "same spot")
+                // We use a small tolerance (e.g. 5px) to detect "basically on top of each other"
+                const collision = page.widgets.some(w =>
+                    Math.abs(w.x - newWidget.x) < 10 && Math.abs(w.y - newWidget.y) < 10
+                );
+
+                if (!collision) break;
+
+                // Shift down-right if occupied
+                newWidget.x += 20;
+                newWidget.y += 20;
+                attempts++;
+            }
 
             // Ensure it fits on canvas
             const dims = this.getCanvasDimensions();

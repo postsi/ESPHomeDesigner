@@ -4,6 +4,7 @@
  * @returns {Object} The parsed layout object containing pages and settings.
  */
 function parseSnippetYamlOffline(yamlText) {
+    console.log("[parseSnippetYamlOffline] Start parsing...");
     const lines = yamlText.split(/\r?\n/);
     const lambdaLines = [];
     let inLambda = false;
@@ -13,7 +14,16 @@ function parseSnippetYamlOffline(yamlText) {
         const line = rawLine.replace(/\t/g, "    ");
 
         if (!inLambda && line.match(/^\s*lambda:\s*\|\-/)) {
+            console.log("[parseSnippetYamlOffline] Found lambda start");
             inLambda = true;
+            continue;
+        }
+
+        // Implicit LVGL mode detection (allow indentation just in case)
+        if (!inLambda && line.match(/^\s*lvgl:/)) {
+            console.log("[parseSnippetYamlOffline] Found LVGL block start");
+            inLambda = true;
+            lambdaIndent = 0;
             continue;
         }
 
@@ -24,26 +34,53 @@ function parseSnippetYamlOffline(yamlText) {
             }
 
             const indentMatch = line.match(/^(\s+)/);
+
             if (!indentMatch) {
-                inLambda = false;
+                // Line has 0 indent.
+                // If it's a root key (like "sensor:"), we exit.
+                // BUT ensure strictly that it looks like a key (ends with :)
+                if (line.match(/^\w+:/)) {
+                    console.log("[parseSnippetYamlOffline] Exiting lambda/LVGL block: hit root key", line.trim());
+                    inLambda = false;
+                    continue;
+                }
+            }
+
+            // Standard Lambda indentation stripping logic
+            if (indentMatch) {
+                const indentLen = indentMatch[1].length;
+                if (lambdaIndent === 0) {
+                    lambdaIndent = indentLen;
+                    console.log(`[parseSnippetYamlOffline] Setting lambdaIndent to ${lambdaIndent}`);
+                }
+
+                if (indentLen < lambdaIndent) {
+                    console.log("[parseSnippetYamlOffline] Exiting lambda/LVGL block: dedent", line.trim());
+                    inLambda = false;
+                    continue;
+                }
+
+                const stripped = line.slice(lambdaIndent);
+                lambdaLines.push(stripped);
+            } else {
+                // No indent, and not a root key? Probably implicit exit or empty line handled above.
+                if (line.match(/^\s*$/)) continue; // extra safety
+
+                // If we are here, it's a non-empty line with 0 indent that didn't look like a root key.
+                // It might be part of a multi-line string? 
+                // For safety in LVGL mode, if we haven't set lambdaIndent yet (still 0), maybe this IS the content?
+                if (lambdaIndent === 0) {
+                    lambdaLines.push(line);
+                } else {
+                    console.log("[parseSnippetYamlOffline] Exiting lambda/LVGL block: 0 indent content", line.trim());
+                    inLambda = false;
+                }
                 continue;
             }
-
-            const indentLen = indentMatch[1].length;
-            if (lambdaIndent === 0) {
-                lambdaIndent = indentLen;
-            }
-
-            if (indentLen < lambdaIndent) {
-                inLambda = false;
-                continue;
-            }
-
-            const stripped = line.slice(lambdaIndent);
-            lambdaLines.push(stripped);
         }
     }
 
+    // Existing ignore logic ...
     while (lines.length && lines[0].match(/^\s*#\s*Local preview snippet/)) {
         lines.shift();
     }
@@ -51,18 +88,32 @@ function parseSnippetYamlOffline(yamlText) {
         lines.pop();
     }
 
+    console.log(`[parseSnippetYamlOffline] Collected ${lambdaLines.length} info lines`);
+
     const pageMap = new Map();
     const intervalMap = new Map();
     const nameMap = new Map();
     let currentPageIndex = null;
 
     for (const line of lambdaLines) {
-        const pageMatch = line.match(/if\s*\(\s*(?:id\s*\(\s*display_page\s*\)|page)\s*==\s*(\d+)\s*\)/);
+        // Native Lambda page check
+        let pageMatch = line.match(/if\s*\(\s*(?:id\s*\(\s*display_page\s*\)|page)\s*==\s*(\d+)\s*\)/);
         if (pageMatch) {
             currentPageIndex = parseInt(pageMatch[1], 10);
             if (!pageMap.has(currentPageIndex)) {
                 pageMap.set(currentPageIndex, []);
             }
+        }
+
+        // LVGL Page check
+        // Looking for: "    - id: page_0"
+        const lvglPageMatch = line.match(/^\s*-\s*id:\s*page_(\d+)/);
+        if (lvglPageMatch) {
+            currentPageIndex = parseInt(lvglPageMatch[1], 10);
+            if (!pageMap.has(currentPageIndex)) {
+                pageMap.set(currentPageIndex, []);
+            }
+            console.log(`[parseSnippetYamlOffline] Detected LVGL Page: ${currentPageIndex}`);
         }
 
         const intervalMatch = line.match(/case\s+(\d+):\s*interval\s*=\s*(\d+);/);
@@ -102,17 +153,26 @@ function parseSnippetYamlOffline(yamlText) {
     currentPageIndex = 0;
 
     function getCurrentPageWidgets() {
+        // Fallback to 0 if page not found (could happen during init)
         const page = layout.pages.find((p, idx) => idx === currentPageIndex);
         return page ? page.widgets : layout.pages[0].widgets;
     }
 
     function parseWidgetMarker(comment) {
+        // Relaxed regex: allow any spacing
         const match = comment.match(/^\/\/\s*widget:(\w+)\s+(.+)$/);
-        if (!match) return null;
+        if (!match) {
+            if (comment.startsWith("// widget:")) {
+                console.warn("[parseWidgetMarker] Regex failed for:", comment);
+            }
+            return null;
+        }
 
         const widgetType = match[1];
         const propsStr = match[2];
         const props = {};
+
+        console.log(`[parseWidgetMarker] Found widget: ${widgetType}`);
 
         // Improved regex to handle:
         // 1. Quoted strings: key:"value with spaces"
@@ -137,9 +197,19 @@ function parseSnippetYamlOffline(yamlText) {
         const trimmed = cmd.trim();
         if (!trimmed || trimmed.startsWith("#")) continue;
 
-        const pageMatch = trimmed.match(/if\s*\(\s*(?:id\s*\(\s*display_page\s*\)|page)\s*==\s*(\d+)\s*\)/);
+        // Native Lambda Page Check
+        let pageMatch = trimmed.match(/if\s*\(\s*(?:id\s*\(\s*display_page\s*\)|page)\s*==\s*(\d+)\s*\)/);
         if (pageMatch) {
             currentPageIndex = parseInt(pageMatch[1], 10);
+            continue;
+        }
+
+        // LVGL Page Check (raw line check from lambdaLines loop context, but trimmed here)
+        // We need to match "- id: page_X"
+        const lvglPageMatch = trimmed.match(/^-\s*id:\s*page_(\d+)/);
+        if (lvglPageMatch) {
+            currentPageIndex = parseInt(lvglPageMatch[1], 10);
+            console.log(`[parseSnippetYamlOffline] Processing widgets for LVGL Page: ${currentPageIndex}`);
             continue;
         }
 
@@ -156,8 +226,16 @@ function parseSnippetYamlOffline(yamlText) {
 
         if (trimmed.startsWith("//")) {
             const marker = parseWidgetMarker(trimmed);
-            if (marker && marker.props.id && marker.props.type) {
+            if (marker && marker.props.id) {
                 const p = marker.props;
+                // Use explicit type from props, or fallback to the type defined in the widget marker header
+                p.type = p.type || marker.widgetType;
+
+                if (!p.type) {
+                    console.warn("[parseSnippetYamlOffline] Widget marker found but no type determined:", trimmed);
+                    continue;
+                }
+
                 const widget = {
                     id: p.id,
                     type: p.type,
@@ -202,13 +280,17 @@ function parseSnippetYamlOffline(yamlText) {
                         italic: (p.italic === "true" || p.italic === true || p.font_style === "italic"),
                         font_family: p.font_family || "Roboto",
                         font_weight: parseInt(p.font_weight || 400, 10),
+                        prefix: p.prefix || "",
+                        postfix: p.postfix || "",
                         unit: p.unit || "",
                         precision: parseInt(p.precision || -1, 10),
                         text_align: p.align || p.text_align || "TOP_LEFT",
                         label_align: p.label_align || p.align || p.text_align || "TOP_LEFT",
                         value_align: p.value_align || p.align || p.text_align || "TOP_LEFT",
-                        is_local_sensor: (p.local === "true")
+                        is_local_sensor: (p.local === "true"),
+                        separator: p.separator || " ~ "
                     };
+                    widget.entity_id_2 = p.entity_2 || "";
                 } else if (p.type === "datetime") {
                     widget.props = {
                         format: p.format || "time_date",
@@ -333,6 +415,32 @@ function parseSnippetYamlOffline(yamlText) {
                         word_wrap: (p.word_wrap !== "false" && p.wrap !== "false"),
                         italic_quote: (p.italic_quote !== "false")
                     };
+                } else if (p.type === "lvgl_button") {
+                    widget.props = {
+                        text: p.text || "BTN",
+                        bg_color: p.bg_color || "white",
+                        color: p.color || "black",
+                        border_width: parseInt(p.border_width || p.border || 2, 10),
+                        radius: parseInt(p.radius || 5, 10)
+                    };
+                } else if (p.type === "lvgl_arc") {
+                    widget.props = {
+                        min: parseInt(p.min || 0, 10),
+                        max: parseInt(p.max || 100, 10),
+                        value: parseInt(p.value || 0, 10),
+                        thickness: parseInt(p.thickness || 10, 10),
+                        color: p.color || "blue"
+                    };
+                } else if (p.type.startsWith("lvgl_")) {
+                    // Generic fallback for other LVGL widgets
+                    // Copy all props from p to widget.props, converting "true"/"false" strings
+                    widget.props = {};
+                    Object.entries(p).forEach(([key, val]) => {
+                        if (key === "id" || key === "type" || key === "x" || key === "y" || key === "w" || key === "h" || key === "title") return;
+                        if (val === "true") widget.props[key] = true;
+                        else if (val === "false") widget.props[key] = false;
+                        else widget.props[key] = val;
+                    });
                 }
 
                 widgets.push(widget);
@@ -545,4 +653,5 @@ function loadLayoutIntoState(layout) {
     // which should trigger UI updates in Sidebar, Canvas, and PropertiesPanel.
     // The legacy editor.js has a sync mechanism that listens for these events
     // to update its own 'pages' array for renderCanvas() compatibility.
+    console.log(`[loadLayoutIntoState] Layout loaded with ${pages.length} pages. Current Layout ID: ${AppState.currentLayoutId}`);
 }

@@ -17,9 +17,11 @@
 
 **No more hand-coding ESPHome display lambdas! 🎉**
 
-Got an E-Ink Display with an ESP chip and frustrated with manually writing display code? Yeah, me too. So I built a drag-and-drop editor that runs right inside Home Assistant.
+Building a custom smart display for Home Assistant? Frustrated with manually writing C++ lambdas and guessing coordinates?
 
-Design your e-ink dashboard visually, click generate, flash it - done. No YAML wrestling required (unless you're into that).
+**Meet your new HMI Designer.**
+
+This is a **visual, drag-and-drop interface designer** that lives right inside Home Assistant. It enables you to build premium, touch-interactive dashboards for various ESP32-based e-Paper devices (like the Seeed reTerminal, TRMNL, and more) without writing a single line of display code.
 
 
 ## What Does It Do?
@@ -80,6 +82,23 @@ Then create a new ESPHome device:
 3. Compile and flash via ESPHome
 
 Done! Your custom dashboard is now running on your device.
+
+### 6. Connect & Automate
+
+Once flashed, your device will come online.
+
+1. Go to **Settings** → **Devices & Services** in Home Assistant.
+2. Your device should be discovered (or you can add it via the ESPHome integration).
+3. **Configure it** to ensure Home Assistant connects to its API.
+
+### Philosophy: Design here, Automate there.
+
+Think of this tool as the **Frontend Designer** for your physical display.
+
+- **Use this tool** to make it look beautiful (pixel-perfect placement, fonts, icons).
+- **Use Home Assistant** for the logic.
+
+We expose everything (buttons, sensors, battery) back to Home Assistant. Does a button press toggle a light? Play a sound? Trigger a scene? **Do that in Home Assistant Automations**, where HA shines best.
 
 ## Widget Types
 
@@ -150,6 +169,7 @@ Done! Your custom dashboard is now running on your device.
 - **Round-Trip Editing** - Import existing ESPHome display code back into the editor
 - **Battery Management** - Voltage monitoring, battery level percentage, icon indicators
 - **Power Saving** - Configurable refresh rates, deep sleep support for night hours
+- **Experimental LVGL Support** - (Beta) Support for LVGL widgets like Arc and Button on capable devices
 
 ## Technical Details
 

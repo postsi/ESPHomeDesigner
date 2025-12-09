@@ -245,11 +245,17 @@ class PropertiesPanel {
                     this.autoPopulateTitleFromEntity(widget.id, v);
                 }
             }, widget);
+            this.addLabeledInputWithPicker("Secondary Entity ID", "text", widget.entity_id_2 || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id_2: v });
+            }, widget);
+            this.addLabeledInput("Separator", "text", props.separator || " ~ ", (v) => updateProp("separator", v));
             this.addLabeledInput("Title/Label", "text", widget.title || "", (v) => {
                 AppState.updateWidget(widget.id, { title: v });
             });
             this.addSelect("Display Format", props.value_format || "label_value", ["label_value", "label_newline_value", "value_only"], (v) => updateProp("value_format", v));
             this.addLabeledInput("Precision", "number", props.precision !== undefined ? props.precision : -1, (v) => updateProp("precision", parseInt(v, 10)));
+            this.addLabeledInputWithDataList("Prefix", "text", props.prefix || "", ["€", "$", "£", "¥", "CHF", "kr"], (v) => updateProp("prefix", v));
+            this.addLabeledInputWithDataList("Postfix", "text", props.postfix || "", [" kWh", " W", " V", " A", " °C", " %", " ppm", " lx"], (v) => updateProp("postfix", v));
             this.addLabeledInput("Unit", "text", props.unit || "", (v) => updateProp("unit", v));
             this.addLabeledInput("Label Size", "number", props.label_font_size || 14, (v) => updateProp("label_font_size", parseInt(v, 10)));
             this.addLabeledInput("Value Size", "number", props.value_font_size || 20, (v) => updateProp("value_font_size", parseInt(v, 10)));
@@ -293,7 +299,7 @@ class PropertiesPanel {
             });
         }
         else if (type === "datetime") {
-            this.addSelect("Display Format", props.format || "time_date", ["time_date", "time_only", "date_only"], (v) => updateProp("format", v));
+            this.addSelect("Display Format", props.format || "time_date", ["time_date", "time_only", "date_only", "weekday_day_month"], (v) => updateProp("format", v));
             this.addLabeledInput("Time Font Size", "number", props.time_font_size || 28, (v) => updateProp("time_font_size", parseInt(v, 10)));
             this.addLabeledInput("Date Font Size", "number", props.date_font_size || 16, (v) => updateProp("date_font_size", parseInt(v, 10)));
             this.addSelect("Color", props.color || "black", colors, (v) => updateProp("color", v));
@@ -665,6 +671,30 @@ class PropertiesPanel {
             this.addSelect("Transparency", props.transparency || "opaque", ["opaque", "chroma_key", "alpha_channel"], (v) => updateProp("transparency", v));
             this.addHint("opaque=no transparency, chroma_key=color key, alpha_channel=smooth blend");
         }
+        else if (type === "lvgl_button") {
+            this.addLabeledInputWithPicker("Action Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Entity to toggle/trigger when clicked");
+
+            this.addLabeledInput("Text", "text", props.text || "BTN", (v) => updateProp("text", v));
+            this.addSelect("Background Color", props.bg_color || "white", colors, (v) => updateProp("bg_color", v));
+            this.addSelect("Text Color", props.color || "black", colors, (v) => updateProp("color", v));
+            this.addLabeledInput("Border Width", "number", props.border_width || 2, (v) => updateProp("border_width", parseInt(v, 10)));
+            this.addLabeledInput("Corner Radius", "number", props.radius || 5, (v) => updateProp("radius", parseInt(v, 10)));
+        }
+        else if (type === "lvgl_arc") {
+            this.addLabeledInputWithPicker("Sensor Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Sensor to bind to arc value");
+            this.addLabeledInput("Min Value", "number", props.min || 0, (v) => updateProp("min", parseInt(v, 10)));
+            this.addLabeledInput("Max Value", "number", props.max || 100, (v) => updateProp("max", parseInt(v, 10)));
+            this.addLabeledInput("Default/Preview Value", "number", props.value || 0, (v) => updateProp("value", parseInt(v, 10)));
+
+            this.addLabeledInput("Thickness", "number", props.thickness || 10, (v) => updateProp("thickness", parseInt(v, 10)));
+            this.addSelect("Color", props.color || "blue", colors, (v) => updateProp("color", v));
+        }
     }
 
     // --- Helpers ---
@@ -740,6 +770,37 @@ class PropertiesPanel {
         hint.style.marginBottom = "8px";
         hint.innerHTML = htmlContent;
         this.panel.appendChild(hint);
+    }
+
+    addLabeledInputWithDataList(label, type, value, suggestions, onChange) {
+        const wrap = document.createElement("div");
+        wrap.className = "field";
+        const lbl = document.createElement("div");
+        lbl.className = "prop-label";
+        lbl.textContent = label;
+
+        const listId = "datalist_" + Math.random().toString(36).substr(2, 9);
+        const dataList = document.createElement("datalist");
+        dataList.id = listId;
+        suggestions.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s;
+            dataList.appendChild(opt);
+        });
+
+        const input = document.createElement("input");
+        input.className = "prop-input";
+        input.type = type;
+        input.value = value;
+        input.setAttribute("list", listId);
+        // Handle both input (typing) and change (selection)
+        input.addEventListener("input", () => onChange(input.value));
+        input.addEventListener("change", () => onChange(input.value));
+
+        wrap.appendChild(lbl);
+        wrap.appendChild(input);
+        wrap.appendChild(dataList);
+        this.panel.appendChild(wrap);
     }
 
     addSectionLabel(text) {

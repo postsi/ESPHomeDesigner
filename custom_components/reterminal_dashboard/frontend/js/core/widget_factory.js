@@ -49,8 +49,10 @@ class WidgetFactory {
                     precision: -1,
                     text_align: "TOP_LEFT",
                     label_align: "TOP_LEFT",
-                    value_align: "TOP_LEFT"
+                    value_align: "TOP_LEFT",
+                    separator: " ~ "
                 };
+                widget.entity_id_2 = "";
                 break;
 
             case "datetime":
@@ -228,6 +230,30 @@ class WidgetFactory {
                     scale: 2,
                     ecc: "LOW",
                     color: "black"
+                };
+                break;
+
+            case "lvgl_button":
+                widget.width = 100;
+                widget.height = 40;
+                widget.props = {
+                    text: "Button",
+                    color: "black",
+                    bg_color: "white",
+                    border_width: 2,
+                    radius: 5
+                };
+                break;
+
+            case "lvgl_arc":
+                widget.width = 100;
+                widget.height = 100;
+                widget.props = {
+                    min: 0,
+                    max: 100,
+                    value: 50,
+                    color: "blue",
+                    thickness: 10
                 };
                 break;
         }

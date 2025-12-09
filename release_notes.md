@@ -2,6 +2,23 @@
 
 
 
+## v0.6.4 - Experimental LVGL & Enhancements
+
+**Release Date:** December 9, 2025
+
+### 🎉 New Features
+- **Experimental LVGL Widgets**: Added experimental support for LVGL `button` and `arc` widgets.
+- **Text Sensor Enhancements**:
+  - **Dual Sensor Support**: Now supports displaying two sensors in one widget.
+  - **Prefix & Suffix**: Added settings for custom prefix and suffix text.
+- **Time & Date Widget**: Added more formatting options for date display.
+
+### 🐛 Bug Fixes
+- **Feature Forecast**: Resolved bug fixes for the weather forecast feature; it should now work correctly.
+- **Graph Widget**: Fixed issue where graphs would intersect/overlap incorrectly.
+
+---
+
 ## v0.6.3 - Entity Handling Improvements
 
 **Release Date:** December 7, 2025

@@ -13,39 +13,59 @@
         const fontStyle = props.italic ? "italic" : "normal";
         const colorStyle = getColorStyle(props.color);
 
+        const entityId2 = widget.entity_id_2 || "";
+        const separator = props.separator || " ~ ";
+
         let displayValue = "--";
         let displayUnit = unitProp;
 
-        // Try to get real state
-        if (window.AppState && window.AppState.entityStates && entityId) {
-            const state = window.AppState.entityStates[entityId];
-            if (state !== undefined && state !== null) {
-                const strState = String(state);
-                // Try to parse number and unit if not provided manually
-                const match = strState.match(/^([-+]?\d*\.?\d+)(.*)$/);
-                if (match) {
-                    const val = parseFloat(match[1]);
-                    const extractedUnit = match[2] || "";
-                    if (!isNaN(val)) {
-                        if (!isNaN(precision) && precision >= 0) {
-                            displayValue = val.toFixed(precision);
-                        } else {
-                            displayValue = val.toString();
+        // Helper to format a single value
+        const formatValue = (eId) => {
+            if (window.AppState && window.AppState.entityStates && eId) {
+                const state = window.AppState.entityStates[eId];
+                if (state !== undefined && state !== null) {
+                    const strState = String(state);
+                    const match = strState.match(/^([-+]?\d*\.?\d+)(.*)$/);
+                    if (match) {
+                        const val = parseFloat(match[1]);
+                        const extractedUnit = match[2] || "";
+                        // Capture unit from first entity if not set manually
+                        if (eId === entityId && (unitProp === undefined || unitProp === "")) {
+                            displayUnit = extractedUnit;
                         }
-                        if (!displayUnit) displayUnit = extractedUnit;
-                    } else {
-                        displayValue = strState;
+                        if (!isNaN(val)) {
+                            if (!isNaN(precision) && precision >= 0) {
+                                return val.toFixed(precision);
+                            }
+                            return val.toString();
+                        }
                     }
-                } else {
-                    displayValue = strState;
+                    // Fallback: update unit from attributes if needed
+                    if (eId === entityId && (unitProp === undefined || unitProp === "") && state.attributes && state.attributes.unit_of_measurement) {
+                        displayUnit = state.attributes.unit_of_measurement;
+                    }
+                    return strState;
                 }
             }
-        } else if (!entityId) {
-            displayValue = "--";
+            return "--";
+        };
+
+        const val1 = formatValue(entityId);
+        let val2 = null;
+        if (entityId2) {
+            val2 = formatValue(entityId2);
         }
 
-        // Full display value with unit
-        const fullValue = `${displayValue}${displayUnit}`.trim();
+        displayValue = val1;
+        if (val2 !== null) {
+            displayValue = `${val1}${separator}${val2}`;
+        }
+
+        const prefix = props.prefix || "";
+        const postfix = props.postfix || "";
+
+        // Full display value with unit, prefix and postfix
+        const fullValue = `${prefix}${displayValue}${displayUnit}${postfix}`.trim();
 
         // Clear element
         el.innerHTML = "";

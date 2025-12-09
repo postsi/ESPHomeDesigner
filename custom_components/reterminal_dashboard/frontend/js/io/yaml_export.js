@@ -1275,7 +1275,7 @@ function generateSnippetLocally() {
         // Skip if no entity, already added (by graph or other sensor_text), local sensor, or not a sensor.* entity
         if (!entityId || addedNumericSensors.has(entityId) || p.is_local_sensor) continue;
         if (!entityId.startsWith("sensor.")) continue; // weather.* and text_sensor.* handled elsewhere
-        
+
         addedNumericSensors.add(entityId);
 
         // Convert HA entity_id to safe ESPHome local sensor ID
@@ -1298,11 +1298,11 @@ function generateSnippetLocally() {
             widgetSensorLines.push(`  # Day ${day} forecast`);
             widgetSensorLines.push(`  - platform: homeassistant`);
             widgetSensorLines.push(`    id: weather_high_day${day}`);
-            widgetSensorLines.push(`    entity_id: sensor.weather_forecast_day${day}_high`);
+            widgetSensorLines.push(`    entity_id: sensor.weather_forecast_day_${day}_high`);
             widgetSensorLines.push(`    internal: true`);
             widgetSensorLines.push(`  - platform: homeassistant`);
             widgetSensorLines.push(`    id: weather_low_day${day}`);
-            widgetSensorLines.push(`    entity_id: sensor.weather_forecast_day${day}_low`);
+            widgetSensorLines.push(`    entity_id: sensor.weather_forecast_day_${day}_low`);
             widgetSensorLines.push(`    internal: true`);
         }
     }
@@ -1416,7 +1416,7 @@ function generateSnippetLocally() {
             for (let day = 0; day < 5; day++) {
                 lines.push(`  - platform: homeassistant`);
                 lines.push(`    id: weather_cond_day${day}`);
-                lines.push(`    entity_id: sensor.weather_forecast_day${day}_condition`);
+                lines.push(`    entity_id: sensor.weather_forecast_day_${day}_condition`);
                 lines.push(`    internal: true`);
             }
         }
@@ -1449,15 +1449,15 @@ function generateSnippetLocally() {
         lines.push("#     sensor:");
         for (let day = 0; day < 5; day++) {
             lines.push(`#       - name: "Weather Forecast Day ${day} High"`);
-            lines.push(`#         unique_id: weather_forecast_day${day}_high`);
+            lines.push(`#         unique_id: weather_forecast_day_${day}_high`);
             lines.push(`#         unit_of_measurement: "°C"`);
             lines.push(`#         state: "{{ forecast_data['weather.forecast_home'].forecast[${day}].temperature | default('N/A') }}"`);
             lines.push(`#       - name: "Weather Forecast Day ${day} Low"`);
-            lines.push(`#         unique_id: weather_forecast_day${day}_low`);
+            lines.push(`#         unique_id: weather_forecast_day_${day}_low`);
             lines.push(`#         unit_of_measurement: "°C"`);
             lines.push(`#         state: "{{ forecast_data['weather.forecast_home'].forecast[${day}].templow | default('N/A') }}"`);
             lines.push(`#       - name: "Weather Forecast Day ${day} Condition"`);
-            lines.push(`#         unique_id: weather_forecast_day${day}_condition`);
+            lines.push(`#         unique_id: weather_forecast_day_${day}_condition`);
             lines.push(`#         state: "{{ forecast_data['weather.forecast_home'].forecast[${day}].condition | default('cloudy') }}"`);
         }
         lines.push("#");
@@ -1471,6 +1471,8 @@ function generateSnippetLocally() {
     lines.push("");
 
     lines.push("display:");
+
+    const useLVGL = window.hasLVGLWidgets && window.hasLVGLWidgets(pagesLocal);
 
     // deviceModel already defined above for hardware profile lookup
     if (deviceModel === "reterminal_e1002") {
@@ -1512,1130 +1514,1206 @@ function generateSnippetLocally() {
         lines.push("    update_interval: never");
     }
 
-    lines.push("    lambda: |-");
-    lines.push("      // Define common colors for widgets");
-    if (getDeviceModel() === "reterminal_e1002") {
-        // E1002 is a color display - use proper RGBA values (4th param is alpha=0)
-        lines.push("      const auto COLOR_ON = Color(0, 0, 0, 0);         // Black");
-        lines.push("      const auto COLOR_OFF = Color(255, 255, 255, 0);  // White");
-        lines.push("      const auto COLOR_RED = Color(255, 0, 0, 0);");
-        lines.push("      const auto COLOR_GREEN = Color(0, 255, 0, 0);");
-        lines.push("      const auto COLOR_BLUE = Color(0, 0, 255, 0);");
-        lines.push("      const auto COLOR_YELLOW = Color(255, 255, 0, 0);");
-    } else {
-        // E1001 is a binary display - use 0/1
-        lines.push("      Color COLOR_ON = Color(1);");
-        lines.push("      Color COLOR_OFF = Color(0);");
+    if (useLVGL) {
+        lines.push("    auto_clear_enabled: false");
     }
-    lines.push("      it.fill(COLOR_OFF);");
-    lines.push("");
-    lines.push("      int page = id(display_page);");
 
-    pages.forEach((page, pageIndex) => {
-        lines.push(`      if (page == ${pageIndex}) {`);
-        lines.push(`        // page:name "${page.name}"`);
-        if (!page.widgets || !page.widgets.length) {
-            lines.push("        // No widgets on this page.");
+    if (!useLVGL) {
+        lines.push("    lambda: |-");
+        lines.push("      // Define common colors for widgets");
+        if (getDeviceModel() === "reterminal_e1002") {
+            // E1002 is a color display - use proper RGBA values (4th param is alpha=0)
+            lines.push("      const auto COLOR_ON = Color(0, 0, 0, 0);         // Black");
+            lines.push("      const auto COLOR_OFF = Color(255, 255, 255, 0);  // White");
+            lines.push("      const auto COLOR_RED = Color(255, 0, 0, 0);");
+            lines.push("      const auto COLOR_GREEN = Color(0, 255, 0, 0);");
+            lines.push("      const auto COLOR_BLUE = Color(0, 0, 255, 0);");
+            lines.push("      const auto COLOR_YELLOW = Color(255, 255, 0, 0);");
         } else {
-            // Helper functions for alignment calculations (shared across all widget types)
-            const getAlignX = (align, x, w) => {
-                if (align.includes("LEFT")) return x;
-                if (align.includes("RIGHT")) return x + w;
-                return x + Math.floor(w / 2);
-            };
+            // E1001 is a binary display - use 0/1
+            lines.push("      Color COLOR_ON = Color(1);");
+            lines.push("      Color COLOR_OFF = Color(0);");
+        }
+        lines.push("      it.fill(COLOR_OFF);");
+        lines.push("");
+        lines.push("      int page = id(display_page);");
 
-            const getAlignY = (align, y, h) => {
-                if (align.includes("TOP")) return y;
-                if (align.includes("BOTTOM")) return y + h;
-                return y + Math.floor(h / 2);
-            };
+        pages.forEach((page, pageIndex) => {
+            lines.push(`      if (page == ${pageIndex}) {`);
+            lines.push(`        // page:name "${page.name}"`);
+            if (!page.widgets || !page.widgets.length) {
+                lines.push("        // No widgets on this page.");
+            } else {
+                // Helper functions for alignment calculations (shared across all widget types)
+                const getAlignX = (align, x, w) => {
+                    if (align.includes("LEFT")) return x;
+                    if (align.includes("RIGHT")) return x + w;
+                    return x + Math.floor(w / 2);
+                };
 
-            // Helper to map color names to ESPHome color constants
-            // For E1002 (color display): supports black, white, red, green, blue, yellow
-            // For E1001 (B&W display): only COLOR_ON and COLOR_OFF
-            const getColorConst = (colorProp) => {
-                const c = (colorProp || "black").toLowerCase();
-                if (c === "white") return "COLOR_OFF";
-                if (getDeviceModel() === "reterminal_e1002") {
-                    if (c === "red") return "COLOR_RED";
-                    if (c === "green") return "COLOR_GREEN";
-                    if (c === "blue") return "COLOR_BLUE";
-                    if (c === "yellow") return "COLOR_YELLOW";
-                }
-                return "COLOR_ON"; // black, gray, or any other falls back to black
-            };
+                const getAlignY = (align, y, h) => {
+                    if (align.includes("TOP")) return y;
+                    if (align.includes("BOTTOM")) return y + h;
+                    return y + Math.floor(h / 2);
+                };
 
-            for (const w of page.widgets) {
-                wrapWithCondition(lines, w, () => {
-                    const t = (w.type || "").toLowerCase();
-                    const p = w.props || {};
-
-                    // Add local sensor marker comment for relevant widgets
-                    let localMarker = "";
-                    if (p.is_local_sensor) {
-                        localMarker = " // local: true";
+                // Helper to map color names to ESPHome color constants
+                // For E1002 (color display): supports black, white, red, green, blue, yellow
+                // For E1001 (B&W display): only COLOR_ON and COLOR_OFF
+                const getColorConst = (colorProp) => {
+                    const c = (colorProp || "black").toLowerCase();
+                    if (c === "white") return "COLOR_OFF";
+                    if (getDeviceModel() === "reterminal_e1002") {
+                        if (c === "red") return "COLOR_RED";
+                        if (c === "green") return "COLOR_GREEN";
+                        if (c === "blue") return "COLOR_BLUE";
+                        if (c === "yellow") return "COLOR_YELLOW";
                     }
+                    return "COLOR_ON"; // black, gray, or any other falls back to black
+                };
 
-                    if (t === "text" || t === "label") {
-                        const txt = (p.text || w.title || "Text").replace(/"/g, '\\"');
-                        if (!txt) return;
-                        const fontSize = parseInt(p.font_size || p.size || 12, 10) || 12;
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const textAlign = p.text_align || "TOP_LEFT";
-                        const fontWeight = p.font_weight || 400;
-                        const fontFamily = p.font_family || "Roboto";
-                        const italic = p.italic ? "true" : "false";
-                        const bpp = p.bpp || 1;
+                for (const w of page.widgets) {
+                    wrapWithCondition(lines, w, () => {
+                        const t = (w.type || "").toLowerCase();
+                        const p = w.props || {};
 
-                        lines.push(`        // widget:text id:${w.id} type:text x:${w.x} y:${w.y} w:${w.width} h:${w.height} text:"${txt}" font_family:"${fontFamily}" size:${fontSize} weight:${fontWeight} italic:${italic} bpp:${bpp} color:${colorProp} align:${textAlign} ${getCondProps(w)}`);
+                        // Parse coordinates as integers to ensure math operations work correctly (preventing string concatenation)
+                        w.x = parseInt(w.x, 10);
+                        w.y = parseInt(w.y, 10);
 
-                        // Only offset X based on alignment, use w.y directly
-                        // ESPHome's TextAlign handles vertical positioning semantically
-                        const alignX = getAlignX(textAlign, w.x, w.width);
-
-                        const italicSuffix = p.italic ? "_italic" : "";
-                        const fontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${fontSize}${italicSuffix}`;
-                        usedFontIds.add(fontId);
-                        lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${fontId}), ${color}, TextAlign::${textAlign}, "${txt}");`);
-                    } else if (t === "sensor_text") {
-                        const entityId = (w.entity_id || "").trim();
-                        const label = (w.title || "").replace(/"/g, '\\"');
-                        const valueFormat = p.value_format || "label_value";
-                        const labelFontSize = parseInt(p.label_font_size || p.label_font || 14, 10) || 14;
-                        const valueFontSize = parseInt(p.value_font_size || p.value_font || 20, 10) || 20;
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const textAlign = p.text_align || "TOP_LEFT";
-                        const labelAlign = p.label_align || textAlign;
-                        const valueAlign = p.value_align || textAlign;
-                        const precision = parseInt(p.precision !== undefined ? p.precision : -1, 10);
-                        const unit = p.unit || "";
-                        const fontFamily = p.font_family || "Roboto";
-                        const fontWeight = parseInt(p.font_weight || 400, 10);
-                        const italic = p.italic ? "true" : "false";
-
-                        lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${label}" format:${valueFormat} label_font_size:${labelFontSize} value_font_size:${valueFontSize} color:${colorProp} text_align:${textAlign} label_align:${labelAlign} value_align:${valueAlign} precision:${precision} unit:"${unit}" font_family:${fontFamily} font_weight:${fontWeight} italic:${italic} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
-
-                        // Only offset X based on alignment, use w.y directly
-                        // ESPHome's TextAlign handles vertical positioning semantically
-                        const alignX = getAlignX(textAlign, w.x, w.width);
-
-                        const italicSuffix = p.italic ? "_italic" : "";
-                        const labelFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${labelFontSize}${italicSuffix}`;
-                        const valueFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${valueFontSize}${italicSuffix}`;
-                        usedFontIds.add(labelFontId);
-                        usedFontIds.add(valueFontId);
-
-                        // Handle missing entity_id gracefully - show placeholder text instead of invalid id() call
-                        if (!entityId) {
-                            // No entity configured - show label with placeholder value
-                            if (label && (valueFormat === "label_value" || valueFormat === "label_newline_value")) {
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
-                                if (valueFormat === "label_newline_value") {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "--");`);
-                                } else {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "--");`);
-                                }
-                            } else {
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "--");`);
-                            }
-                            lines.push(`        // WARNING: No entity_id configured for this sensor_text widget`);
-                        } else {
-                            // Determine if this is a text-based entity (weather, text_sensor) or numeric sensor
-                            const isTextEntity = entityId.startsWith("weather.") || entityId.startsWith("text_sensor.") || p.is_text_sensor;
-                            const safeEntityId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
-
-                            // Build format specifier and value expression based on entity type
-                            let fmtSpec, valueExpr;
-                            if (isTextEntity) {
-                                // Text-based entity: use %s and .state.c_str()
-                                fmtSpec = "%s";
-                                valueExpr = `id(${safeEntityId}).state.c_str()`;
-                            } else {
-                                // Numeric sensor: use precision-based float format
-                                fmtSpec = `%.${precision >= 0 ? precision : 1}f%s`;
-                                valueExpr = `id(${safeEntityId}).state, "${unit}"`;
-                            }
-
-                            // Generate output based on value format
-                            if (label && valueFormat === "label_value") {
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
-                                if (isTextEntity) {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
-                                } else {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
-                                }
-                            } else if (valueFormat === "label_newline_value") {
-                                // Label on one line, value on next
-                                lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
-                                if (isTextEntity) {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
-                                } else {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
-                                }
-                            } else {
-                                // Just value (value_only or fallback)
-                                if (isTextEntity) {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
-                                } else {
-                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
-                                }
-                            }
+                        // Add local sensor marker comment for relevant widgets
+                        let localMarker = "";
+                        if (p.is_local_sensor) {
+                            localMarker = " // local: true";
                         }
 
-                    } else if (t === "line") {
-                        const strokeWidth = parseInt(p.stroke_width || 3, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const orientation = p.orientation || "horizontal";
+                        if (t === "text" || t === "label") {
+                            const txt = (p.text || w.title || "Text").replace(/"/g, '\\"');
+                            if (!txt) return;
+                            const fontSize = parseInt(p.font_size || p.size || 12, 10) || 12;
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const textAlign = p.text_align || "TOP_LEFT";
+                            const fontWeight = p.font_weight || 400;
+                            const fontFamily = p.font_family || "Roboto";
+                            const italic = p.italic ? "true" : "false";
+                            const bpp = p.bpp || 1;
 
-                        // Use filled_rectangle for lines - simpler and supports thickness
-                        // For horizontal: width is w.width (line length), height is strokeWidth
-                        // For vertical: width is strokeWidth, height is w.height (line length)
+                            lines.push(`        // widget:text id:${w.id} type:text x:${w.x} y:${w.y} w:${w.width} h:${w.height} text:"${txt}" font_family:"${fontFamily}" size:${fontSize} weight:${fontWeight} italic:${italic} bpp:${bpp} color:${colorProp} align:${textAlign} ${getCondProps(w)}`);
 
-                        let rectW, rectH;
+                            // Only offset X based on alignment, use w.y directly
+                            // ESPHome's TextAlign handles vertical positioning semantically
+                            const alignX = getAlignX(textAlign, w.x, w.width);
 
-                        if (orientation === "vertical") {
-                            rectW = strokeWidth;
-                            rectH = w.height;
-                        } else {
-                            rectW = w.width;
-                            rectH = strokeWidth;
-                        }
+                            const italicSuffix = p.italic ? "_italic" : "";
+                            const fontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${fontSize}${italicSuffix}`;
+                            usedFontIds.add(fontId);
+                            lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${fontId}), ${color}, TextAlign::${textAlign}, "${txt}");`);
+                        } else if (t === "sensor_text") {
+                            const entityId = (w.entity_id || "").trim();
+                            const label = (w.title || "").replace(/"/g, '\\"');
+                            const valueFormat = p.value_format || "label_value";
+                            const labelFontSize = parseInt(p.label_font_size || p.label_font || 14, 10) || 14;
+                            const valueFontSize = parseInt(p.value_font_size || p.value_font || 20, 10) || 20;
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const textAlign = p.text_align || "TOP_LEFT";
+                            const labelAlign = p.label_align || textAlign;
+                            const valueAlign = p.value_align || textAlign;
+                            const precision = parseInt(p.precision !== undefined ? p.precision : -1, 10);
+                            const unit = p.unit || "";
+                            const fontFamily = p.font_family || "Roboto";
+                            const fontWeight = parseInt(p.font_weight || 400, 10);
+                            const italic = p.italic ? "true" : "false";
+                            const prefix = (p.prefix || "").replace(/"/g, '\\"');
+                            const postfix = (p.postfix || "").replace(/"/g, '\\"');
 
-                        lines.push(`        // widget:line id:${w.id} type:line x:${w.x} y:${w.y} w:${rectW} h:${rectH} stroke:${strokeWidth} color:${colorProp} orientation:${orientation}`);
-                        lines.push(`        it.filled_rectangle(${w.x}, ${w.y}, ${rectW}, ${rectH}, ${color});`);
+                            lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${label}" format:${valueFormat} label_font_size:${labelFontSize} value_font_size:${valueFontSize} color:${colorProp} text_align:${textAlign} label_align:${labelAlign} value_align:${valueAlign} precision:${precision} prefix:"${prefix}" postfix:"${postfix}" unit:"${unit}" font_family:${fontFamily} font_weight:${fontWeight} italic:${italic} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
 
-                    } else if (t === "shape_rect") {
-                        const borderWidth = parseInt(p.border_width || 1, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const fill = p.fill;
-                        const opacity = parseInt(p.opacity || 100, 10);
-                        const isGray = colorProp.toLowerCase() === "gray";
-                        const rectY = w.y + RECT_Y_OFFSET;
+                            // Only offset X based on alignment, use w.y directly
+                            // ESPHome's TextAlign handles vertical positioning semantically
+                            const alignX = getAlignX(textAlign, w.x, w.width);
 
-                        lines.push(`        // widget:shape_rect id:${w.id} type:shape_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
+                            const italicSuffix = p.italic ? "_italic" : "";
+                            const labelFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${labelFontSize}${italicSuffix}`;
+                            const valueFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${valueFontSize}${italicSuffix}`;
+                            usedFontIds.add(labelFontId);
+                            usedFontIds.add(valueFontId);
 
-                        if (fill) {
-                            if (isGray) {
-                                // Gray: use 50% checkerboard dithering pattern
-                                lines.push(`        // Gray fill using 50% checkerboard dithering pattern`);
-                                lines.push(`        for (int dy = 0; dy < ${w.height}; dy++) {`);
-                                lines.push(`          for (int dx = 0; dx < ${w.width}; dx++) {`);
-                                lines.push(`            if ((dx + dy) % 2 == 0) {`);
-                                lines.push(`              it.draw_pixel_at(${w.x}+dx, ${rectY}+dy, COLOR_ON);`);
-                                lines.push(`            }`);
-                                lines.push(`          }`);
-                                lines.push(`        }`);
-                            } else {
-                                lines.push(`        it.filled_rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
-                            }
-                        } else {
-                            lines.push(`        it.rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
-                            // TODO: Handle border width > 1 for non-filled rects if needed (by drawing multiple rects or using a helper)
-                        }
-
-                    } else if (t === "shape_circle") {
-                        const borderWidth = parseInt(p.border_width || 1, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const fill = p.fill;
-                        const opacity = parseInt(p.opacity || 100, 10);
-                        const isGray = colorProp.toLowerCase() === "gray";
-                        const radius = Math.floor(Math.min(w.width, w.height) / 2);
-                        const cx = w.x + radius;
-                        const cy = w.y + radius;
-
-                        lines.push(`        // widget:shape_circle id:${w.id} type:shape_circle x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
-
-                        if (fill) {
-                            if (isGray) {
-                                // Gray: use 50% checkerboard dithering pattern for circle
-                                lines.push(`        // Gray circle fill using 50% checkerboard dithering pattern`);
-                                lines.push(`        for (int dy = -${radius}; dy <= ${radius}; dy++) {`);
-                                lines.push(`          for (int dx = -${radius}; dx <= ${radius}; dx++) {`);
-                                lines.push(`            if (dx*dx + dy*dy <= ${radius}*${radius}) {`);
-                                lines.push(`              if ((dx + dy) % 2 == 0) {`);
-                                lines.push(`                it.draw_pixel_at(${cx}+dx, ${cy}+dy, COLOR_ON);`);
-                                lines.push(`              }`);
-                                lines.push(`            }`);
-                                lines.push(`          }`);
-                                lines.push(`        }`);
-                            } else {
-                                lines.push(`        it.filled_circle(${cx}, ${cy}, ${radius}, ${color});`);
-                            }
-                        } else {
-                            lines.push(`        it.circle(${cx}, ${cy}, ${radius}, ${color});`);
-                        }
-
-                    } else if (t === "icon") {
-                        const code = (p.code || "F0595").replace(/^0x/i, "");
-                        const size = parseInt(p.size || 48, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const fontRef = `font_mdi_${size}`;
-                        lines.push(`        // widget:icon id:${w.id} type:icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} code:${code} size:${size} color:${colorProp} ${getCondProps(w)}`);
-                        lines.push(`        it.print(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000${code}");`);
-
-                    } else if (t === "graph") {
-                        const entityId = (w.entity_id || "").trim();
-                        const title = (w.title || "").replace(/"/g, '\\"');
-                        const duration = p.duration || "1h";
-                        const borderEnabled = p.border !== false;
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const lineType = p.line_type || "SOLID";
-                        const lineThickness = parseInt(p.line_thickness || 3, 10);
-                        const continuous = !!p.continuous;
-                        const minValue = p.min_value || "";
-                        const maxValue = p.max_value || "";
-                        const minRange = p.min_range || "";
-                        const maxRange = p.max_range || "";
-                        const safeId = `graph_${w.id}`.replace(/-/g, "_");
-                        usedFontIds.add("font_roboto_400_12"); // Graph uses small font for labels
-
-                        // Grid settings: use explicit values or compute sensible defaults if grid is enabled
-                        const gridEnabled = p.grid !== false;
-                        let xGrid = p.x_grid || "";
-                        let yGrid = p.y_grid || "";
-
-                        // If grid is enabled but x_grid/y_grid are empty, compute defaults
-                        if (gridEnabled) {
-                            if (!xGrid) {
-                                // Parse duration
-                                const durationMatch = duration.match(/^(\d+(?:\.\d+)?)(min|h|d)$/);
-                                if (durationMatch) {
-                                    const val = parseFloat(durationMatch[1]);
-                                    const unit = durationMatch[2];
-                                    let gridVal = val / 4;
-                                    if (unit === "h") {
-                                        if (gridVal >= 1) xGrid = `${Math.round(gridVal)}h`;
-                                        else xGrid = `${Math.round(gridVal * 60)}min`;
-                                    } else if (unit === "min") {
-                                        xGrid = `${Math.round(gridVal)}min`;
-                                    } else if (unit === "d") {
-                                        xGrid = `${Math.round(gridVal * 24)}h`;
+                            // Handle missing entity_id gracefully - show placeholder text instead of invalid id() call
+                            if (!entityId) {
+                                // No entity configured - show label with placeholder value
+                                if (label && (valueFormat === "label_value" || valueFormat === "label_newline_value")) {
+                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
+                                    if (valueFormat === "label_newline_value") {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "--");`);
+                                    } else {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "--");`);
                                     }
                                 } else {
-                                    xGrid = "1h"; // Fallback
+                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "--");`);
+                                }
+                                lines.push(`        // WARNING: No entity_id configured for this sensor_text widget`);
+                            } else {
+                                // Determine if this is a text-based entity (weather, text_sensor) or numeric sensor
+                                const isTextEntity = entityId.startsWith("weather.") || entityId.startsWith("text_sensor.") || p.is_text_sensor;
+                                const safeEntityId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
+
+                                const entityId2 = (w.entity_id_2 || "").trim();
+                                const safeEntityId2 = entityId2.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
+                                const separator = p.separator || " ~ ";
+                                const isTextEntity2 = entityId2.startsWith("weather.") || entityId2.startsWith("text_sensor.");
+
+                                let val1Fmt, val1Expr;
+                                if (isTextEntity) {
+                                    val1Fmt = "%s";
+                                    val1Expr = `id(${safeEntityId}).state.c_str()`;
+                                } else {
+                                    val1Fmt = `%.${precision >= 0 ? precision : 1}f`;
+                                    val1Expr = `id(${safeEntityId}).state`;
+                                }
+
+                                let combinedFmt = `${prefix}${val1Fmt}`;
+                                let combinedExpr = val1Expr;
+
+                                if (entityId2) {
+                                    let val2Fmt, val2Expr;
+                                    if (isTextEntity2) {
+                                        val2Fmt = "%s";
+                                        val2Expr = `id(${safeEntityId2}).state.c_str()`;
+                                    } else {
+                                        val2Fmt = `%.${precision >= 0 ? precision : 1}f`;
+                                        val2Expr = `id(${safeEntityId2}).state`;
+                                    }
+                                    combinedFmt += `${separator}${val2Fmt}`;
+                                    combinedExpr += `, ${val2Expr}`;
+                                }
+
+                                // Unit/Suffix Handling
+                                let suffixExpr = `"${postfix}"`; // Default for text entities
+                                if (!isTextEntity) {
+                                    // Numeric sensor: use precision-based float format
+                                    // Prefix goes before, unit/postfix go after
+
+                                    // Resolve unit: Manual > AppState (Attribute) > AppState (Regex) > ESPHome (Native)
+                                    let resolvedUnit = unit;
+
+                                    // Try to auto-detect from AppState if available (Designer Context)
+                                    if (!resolvedUnit && window.AppState && window.AppState.entityStates) {
+                                        const stateObj = window.AppState.entityStates[entityId];
+                                        if (stateObj) {
+                                            if (stateObj.attributes && stateObj.attributes.unit_of_measurement) {
+                                                resolvedUnit = stateObj.attributes.unit_of_measurement;
+                                            } else {
+                                                // Try regex from state string
+                                                const strState = String(stateObj.state);
+                                                const match = strState.match(/^([-+]?\d*\.?\d+)(.*)$/);
+                                                if (match && match[2]) {
+                                                    resolvedUnit = match[2].trim();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (resolvedUnit) {
+                                        // Manual or AppState-detected unit
+                                        suffixExpr = `"${resolvedUnit}${postfix}"`;
+                                    } else {
+                                        // Fallback: use native sensor unit from ESPHome runtime
+                                        suffixExpr = `(id(${safeEntityId}).get_unit_of_measurement() + "${postfix}").c_str()`;
+                                    }
+                                }
+
+                                fmtSpec = `${combinedFmt}%s`;
+                                valueExpr = `${combinedExpr}, ${suffixExpr}`;
+
+                                // Generate output based on value format
+                                if (label && valueFormat === "label_value") {
+                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
+                                    if (isTextEntity) {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                    } else {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                    }
+                                } else if (valueFormat === "label_newline_value") {
+                                    // Label on one line, value on next
+                                    lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${labelFontId}), ${color}, TextAlign::${textAlign}, "${label}");`);
+                                    if (isTextEntity) {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                    } else {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${labelFontSize} + 4 + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                    }
+                                } else {
+                                    // Just value (value_only or fallback)
+                                    if (isTextEntity) {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                    } else {
+                                        lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
+                                    }
                                 }
                             }
 
-                            if (!yGrid) {
-                                // Calculate y_grid based on min/max value range
+                        } else if (t === "line") {
+                            const strokeWidth = parseInt(p.stroke_width || 3, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const orientation = p.orientation || "horizontal";
+
+                            // Use filled_rectangle for lines - simpler and supports thickness
+                            // For horizontal: width is w.width (line length), height is strokeWidth
+                            // For vertical: width is strokeWidth, height is w.height (line length)
+
+                            let rectW, rectH;
+
+                            if (orientation === "vertical") {
+                                rectW = strokeWidth;
+                                rectH = w.height;
+                            } else {
+                                rectW = w.width;
+                                rectH = strokeWidth;
+                            }
+
+                            lines.push(`        // widget:line id:${w.id} type:line x:${w.x} y:${w.y} w:${rectW} h:${rectH} stroke:${strokeWidth} color:${colorProp} orientation:${orientation}`);
+                            lines.push(`        it.filled_rectangle(${w.x}, ${w.y}, ${rectW}, ${rectH}, ${color});`);
+
+                        } else if (t === "shape_rect") {
+                            const borderWidth = parseInt(p.border_width || 1, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const fill = p.fill;
+                            const opacity = parseInt(p.opacity || 100, 10);
+                            const isGray = colorProp.toLowerCase() === "gray";
+                            const rectY = w.y + RECT_Y_OFFSET;
+
+                            lines.push(`        // widget:shape_rect id:${w.id} type:shape_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
+
+                            if (fill) {
+                                if (isGray) {
+                                    // Gray: use 50% checkerboard dithering pattern
+                                    lines.push(`        // Gray fill using 50% checkerboard dithering pattern`);
+                                    lines.push(`        for (int dy = 0; dy < ${w.height}; dy++) {`);
+                                    lines.push(`          for (int dx = 0; dx < ${w.width}; dx++) {`);
+                                    lines.push(`            if ((dx + dy) % 2 == 0) {`);
+                                    lines.push(`              it.draw_pixel_at(${w.x}+dx, ${rectY}+dy, COLOR_ON);`);
+                                    lines.push(`            }`);
+                                    lines.push(`          }`);
+                                    lines.push(`        }`);
+                                } else {
+                                    lines.push(`        it.filled_rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
+                                }
+                            } else {
+                                lines.push(`        it.rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
+                                // TODO: Handle border width > 1 for non-filled rects if needed (by drawing multiple rects or using a helper)
+                            }
+
+                        } else if (t === "shape_circle") {
+                            const borderWidth = parseInt(p.border_width || 1, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const fill = p.fill;
+                            const opacity = parseInt(p.opacity || 100, 10);
+                            const isGray = colorProp.toLowerCase() === "gray";
+                            const radius = Math.floor(Math.min(w.width, w.height) / 2);
+                            const cx = w.x + radius;
+                            const cy = w.y + radius;
+
+                            lines.push(`        // widget:shape_circle id:${w.id} type:shape_circle x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
+
+                            if (fill) {
+                                if (isGray) {
+                                    // Gray: use 50% checkerboard dithering pattern for circle
+                                    lines.push(`        // Gray circle fill using 50% checkerboard dithering pattern`);
+                                    lines.push(`        for (int dy = -${radius}; dy <= ${radius}; dy++) {`);
+                                    lines.push(`          for (int dx = -${radius}; dx <= ${radius}; dx++) {`);
+                                    lines.push(`            if (dx*dx + dy*dy <= ${radius}*${radius}) {`);
+                                    lines.push(`              if ((dx + dy) % 2 == 0) {`);
+                                    lines.push(`                it.draw_pixel_at(${cx}+dx, ${cy}+dy, COLOR_ON);`);
+                                    lines.push(`              }`);
+                                    lines.push(`            }`);
+                                    lines.push(`          }`);
+                                    lines.push(`        }`);
+                                } else {
+                                    lines.push(`        it.filled_circle(${cx}, ${cy}, ${radius}, ${color});`);
+                                }
+                            } else {
+                                lines.push(`        it.circle(${cx}, ${cy}, ${radius}, ${color});`);
+                            }
+
+                        } else if (t === "icon") {
+                            const code = (p.code || "F0595").replace(/^0x/i, "");
+                            const size = parseInt(p.size || 48, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const fontRef = `font_mdi_${size}`;
+                            lines.push(`        // widget:icon id:${w.id} type:icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} code:${code} size:${size} color:${colorProp} ${getCondProps(w)}`);
+                            lines.push(`        it.print(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000${code}");`);
+
+                        } else if (t === "graph") {
+                            const entityId = (w.entity_id || "").trim();
+                            const title = (w.title || "").replace(/"/g, '\\"');
+                            const duration = p.duration || "1h";
+                            const borderEnabled = p.border !== false;
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const lineType = p.line_type || "SOLID";
+                            const lineThickness = parseInt(p.line_thickness || 3, 10);
+                            const continuous = !!p.continuous;
+                            const minValue = p.min_value || "";
+                            const maxValue = p.max_value || "";
+                            const minRange = p.min_range || "";
+                            const maxRange = p.max_range || "";
+                            const safeId = `graph_${w.id}`.replace(/-/g, "_");
+                            usedFontIds.add("font_roboto_400_12"); // Graph uses small font for labels
+
+                            // Grid settings: use explicit values or compute sensible defaults if grid is enabled
+                            const gridEnabled = p.grid !== false;
+                            let xGrid = p.x_grid || "";
+                            let yGrid = p.y_grid || "";
+
+                            // If grid is enabled but x_grid/y_grid are empty, compute defaults
+                            if (gridEnabled) {
+                                if (!xGrid) {
+                                    // Parse duration
+                                    const durationMatch = duration.match(/^(\d+(?:\.\d+)?)(min|h|d)$/);
+                                    if (durationMatch) {
+                                        const val = parseFloat(durationMatch[1]);
+                                        const unit = durationMatch[2];
+                                        let gridVal = val / 4;
+                                        if (unit === "h") {
+                                            if (gridVal >= 1) xGrid = `${Math.round(gridVal)}h`;
+                                            else xGrid = `${Math.round(gridVal * 60)}min`;
+                                        } else if (unit === "min") {
+                                            xGrid = `${Math.round(gridVal)}min`;
+                                        } else if (unit === "d") {
+                                            xGrid = `${Math.round(gridVal * 24)}h`;
+                                        }
+                                    } else {
+                                        xGrid = "1h"; // Fallback
+                                    }
+                                }
+
+                                if (!yGrid) {
+                                    // Calculate y_grid based on min/max value range
+                                    const minVal = parseFloat(minValue) || 0;
+                                    const maxVal = parseFloat(maxValue) || 100;
+                                    const range = maxVal - minVal;
+                                    const step = range / 4;
+                                    const niceStep = Math.pow(10, Math.floor(Math.log10(step)));
+                                    const normalized = step / niceStep;
+                                    let yGridVal;
+                                    if (normalized <= 1) yGridVal = niceStep;
+                                    else if (normalized <= 2) yGridVal = 2 * niceStep;
+                                    else if (normalized <= 5) yGridVal = 5 * niceStep;
+                                    else yGridVal = 10 * niceStep;
+                                    yGrid = String(yGridVal);
+                                }
+                            }
+
+                            lines.push(`        // widget:graph id:${w.id} type:graph x:${w.x} y:${w.y} w:${w.width} h:${w.height} title:"${title}" entity:${entityId} local:${!!p.is_local_sensor} duration:${duration} border:${borderEnabled} color:${colorProp} x_grid:${xGrid} y_grid:${yGrid} line_type:${lineType} line_thickness:${lineThickness} continuous:${continuous} min_value:${minValue} max_value:${maxValue} min_range:${minRange} max_range:${maxRange} ${getCondProps(w)}`);
+
+                            if (entityId) {
+                                // Pass color as 4th parameter to set border/grid color (required for e-paper)
+                                lines.push(`        it.graph(${w.x}, ${w.y}, id(${safeId}), ${color});`);
+
+                                // Draw Border if enabled
+                                if (borderEnabled) {
+                                    lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
+                                }
+
+                                // Draw Grid Lines if configured
+                                // Note: ESPHome graph component doesn't draw grid lines automatically on e-paper
+                                // We must draw them manually in the lambda
+
+                                // Y-Grid (Horizontal lines)
+                                if (yGrid) {
+                                    // Drawing 4 horizontal grid lines as a default if enabled
+                                    const ySteps = 4;
+                                    for (let i = 1; i < ySteps; i++) {
+                                        const yOffset = Math.round(w.height * (i / ySteps));
+                                        lines.push(`        for (int i = 0; i < ${w.width}; i += 4) {`);
+                                        lines.push(`          it.draw_pixel_at(${w.x} + i, ${w.y + yOffset}, ${color});`);
+                                        lines.push(`        }`);
+                                    }
+                                }
+
+                                // X-Grid (Vertical lines)
+                                if (xGrid) {
+                                    // Drawing 4 vertical grid lines as a default if enabled
+                                    const xSteps = 4;
+                                    for (let i = 1; i < xSteps; i++) {
+                                        const xOffset = Math.round(w.width * (i / xSteps));
+                                        lines.push(`        for (int i = 0; i < ${w.height}; i += 4) {`);
+                                        lines.push(`          it.draw_pixel_at(${w.x + xOffset}, ${w.y} + i, ${color});`);
+                                        lines.push(`        }`);
+                                    }
+                                }
+                                if (title) {
+                                    lines.push(`        it.printf(${w.x}+4, ${w.y}+2, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
+                                }
                                 const minVal = parseFloat(minValue) || 0;
                                 const maxVal = parseFloat(maxValue) || 100;
-                                const range = maxVal - minVal;
-                                const step = range / 4;
-                                const niceStep = Math.pow(10, Math.floor(Math.log10(step)));
-                                const normalized = step / niceStep;
-                                let yGridVal;
-                                if (normalized <= 1) yGridVal = niceStep;
-                                else if (normalized <= 2) yGridVal = 2 * niceStep;
-                                else if (normalized <= 5) yGridVal = 5 * niceStep;
-                                else yGridVal = 10 * niceStep;
-                                yGrid = String(yGridVal);
-                            }
-                        }
-
-                        lines.push(`        // widget:graph id:${w.id} type:graph x:${w.x} y:${w.y} w:${w.width} h:${w.height} title:"${title}" entity:${entityId} local:${!!p.is_local_sensor} duration:${duration} border:${borderEnabled} color:${colorProp} x_grid:${xGrid} y_grid:${yGrid} line_type:${lineType} line_thickness:${lineThickness} continuous:${continuous} min_value:${minValue} max_value:${maxValue} min_range:${minRange} max_range:${maxRange} ${getCondProps(w)}`);
-
-                        if (entityId) {
-                            // Pass color as 4th parameter to set border/grid color (required for e-paper)
-                            lines.push(`        it.graph(${w.x}, ${w.y}, id(${safeId}), ${color});`);
-
-                            // Draw Border if enabled
-                            if (borderEnabled) {
-                                lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
-                            }
-
-                            // Draw Grid Lines if configured
-                            // Note: ESPHome graph component doesn't draw grid lines automatically on e-paper
-                            // We must draw them manually in the lambda
-
-                            // Y-Grid (Horizontal lines)
-                            if (yGrid) {
-                                // Drawing 4 horizontal grid lines as a default if enabled
+                                const yRange = maxVal - minVal;
                                 const ySteps = 4;
-                                for (let i = 1; i < ySteps; i++) {
-                                    const yOffset = Math.round(w.height * (i / ySteps));
-                                    lines.push(`        for (int i = 0; i < ${w.width}; i += 4) {`);
-                                    lines.push(`          it.draw_pixel_at(${w.x} + i, ${w.y + yOffset}, ${color});`);
-                                    lines.push(`        }`);
+                                for (let i = 0; i <= ySteps; i++) {
+                                    const val = minVal + (yRange * (i / ySteps));
+                                    const yOffset = Math.round(w.height * (1 - (i / ySteps)));
+                                    const fmt = yRange >= 10 ? "%.0f" : "%.1f";
+                                    lines.push(`        it.printf(${w.x} - 4, ${w.y} + ${yOffset} - 6, id(font_roboto_400_12), ${color}, TextAlign::TOP_RIGHT, "${fmt}", (float)${val});`);
+                                }
+                                let durationSec = 3600;
+                                const durMatch = duration.match(/^(\d+)([a-z]+)$/i);
+                                if (durMatch) {
+                                    const v = parseInt(durMatch[1], 10);
+                                    const u = durMatch[2].toLowerCase();
+                                    if (u.startsWith("s")) durationSec = v;
+                                    else if (u.startsWith("m")) durationSec = v * 60;
+                                    else if (u.startsWith("h")) durationSec = v * 3600;
+                                    else if (u.startsWith("d")) durationSec = v * 86400;
+                                }
+                                const xSteps = 2;
+                                for (let i = 0; i <= xSteps; i++) {
+                                    const ratio = i / xSteps;
+                                    const xOffset = Math.round(w.width * ratio);
+                                    let align = "TextAlign::TOP_CENTER";
+                                    if (i === 0) align = "TextAlign::TOP_LEFT";
+                                    if (i === xSteps) align = "TextAlign::TOP_RIGHT";
+                                    let labelText = "";
+                                    if (i === xSteps) labelText = "Now";
+                                    else {
+                                        const timeAgo = durationSec * (1 - ratio);
+                                        if (timeAgo >= 3600) labelText = `-${(timeAgo / 3600).toFixed(1)}h`;
+                                        else if (timeAgo >= 60) labelText = `-${(timeAgo / 60).toFixed(0)}m`;
+                                        else labelText = `-${timeAgo.toFixed(0)}s`;
+                                    }
+                                    lines.push(`        it.printf(${w.x} + ${xOffset}, ${w.y} + ${w.height} + 2, id(font_roboto_400_12), ${color}, ${align}, "${labelText}");`);
+                                }
+                            } else {
+                                lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
+                                lines.push(`        it.printf(${w.x}+5, ${w.y}+5, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "Graph (no entity)");`);
+                            }
+                        } else if (t === "progress_bar") {
+                            const entityId = (w.entity_id || "").trim();
+                            const title = (w.title || "").replace(/"/g, '\\"');
+                            const showLabel = p.show_label !== false;
+                            const showPercentage = p.show_percentage !== false;
+                            const barHeight = parseInt(p.bar_height || 15, 10);
+                            const borderWidth = parseInt(p.border_width || 1, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            usedFontIds.add("font_roboto_400_12"); // Progress bar uses small font for labels
+
+                            lines.push(`        // widget:progress_bar id:${w.id} type:progress_bar x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${title}" show_label:${showLabel} show_pct:${showPercentage} bar_height:${barHeight} border:${borderWidth} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
+
+                            if (entityId) {
+                                const safeId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
+                                lines.push(`        float val_${w.id} = id(${safeId}).state;`);
+                                lines.push(`        if (std::isnan(val_${w.id})) val_${w.id} = 0;`);
+                                lines.push(`        int pct_${w.id} = (int)val_${w.id};`);
+                                lines.push(`        if (pct_${w.id} < 0) pct_${w.id} = 0;`);
+                                lines.push(`        if (pct_${w.id} > 100) pct_${w.id} = 100;`);
+                                if (showLabel && title) {
+                                    lines.push(`        it.printf(${w.x}, ${w.y}, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
+                                }
+                                if (showPercentage) {
+                                    lines.push(`        it.printf(${w.x} + ${w.width}, ${w.y}, id(font_roboto_400_12), ${color}, TextAlign::TOP_RIGHT, "%d%%", pct_${w.id});`);
+                                }
+                                const barY = w.y + (w.height - barHeight);
+                                lines.push(`        it.rectangle(${w.x}, ${barY}, ${w.width}, ${barHeight}, ${color});`);
+                                lines.push(`        if (pct_${w.id} > 0) {`);
+                                lines.push(`          int bar_w = (${w.width} - 4) * pct_${w.id} / 100;`);
+                                lines.push(`          it.filled_rectangle(${w.x} + 2, ${barY} + 2, bar_w, ${barHeight} - 4, ${color});`);
+                                lines.push(`        }`);
+                            } else {
+                                lines.push(`        it.rectangle(${w.x}, ${w.y} + ${w.height} - ${barHeight}, ${w.width}, ${barHeight}, ${color});`);
+                                lines.push(`        it.filled_rectangle(${w.x} + 2, ${w.y} + ${w.height} - ${barHeight} + 2, ${w.width} / 2, ${barHeight} - 4, ${color});`);
+                                if (showLabel && title) {
+                                    lines.push(`        it.printf(${w.x}, ${w.y}, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
                                 }
                             }
+                        } else if (t === "icon") {
+                            const code = (p.code || "F0595").replace(/^0x/i, "");
+                            const size = parseInt(p.size || 48, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const fontRef = `font_mdi_${size}`;
+                            lines.push(`        // widget:icon id:${w.id} type:icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} code:${code} size:${size} color:${colorProp} ${getCondProps(w)}`);
+                            lines.push(`        it.print(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000${code}");`);
+                        } else if (t === "battery_icon") {
+                            const entityId = (w.entity_id || "").trim();
+                            const size = parseInt(p.size || 24, 10);
+                            const fontSize = parseInt(p.font_size || 12, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const fontRef = `font_mdi_${size}`;
+                            const pctFontRef = `font_roboto_400_${fontSize}`;
+                            usedFontIds.add(pctFontRef);
 
-                            // X-Grid (Vertical lines)
-                            if (xGrid) {
-                                // Drawing 4 vertical grid lines as a default if enabled
-                                const xSteps = 4;
-                                for (let i = 1; i < xSteps; i++) {
-                                    const xOffset = Math.round(w.width * (i / xSteps));
-                                    lines.push(`        for (int i = 0; i < ${w.height}; i += 4) {`);
-                                    lines.push(`          it.draw_pixel_at(${w.x + xOffset}, ${w.y} + i, ${color});`);
-                                    lines.push(`        }`);
-                                }
-                            }
-                            if (title) {
-                                lines.push(`        it.printf(${w.x}+4, ${w.y}+2, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
-                            }
-                            const minVal = parseFloat(minValue) || 0;
-                            const maxVal = parseFloat(maxValue) || 100;
-                            const yRange = maxVal - minVal;
-                            const ySteps = 4;
-                            for (let i = 0; i <= ySteps; i++) {
-                                const val = minVal + (yRange * (i / ySteps));
-                                const yOffset = Math.round(w.height * (1 - (i / ySteps)));
-                                const fmt = yRange >= 10 ? "%.0f" : "%.1f";
-                                lines.push(`        it.printf(${w.x} - 4, ${w.y} + ${yOffset} - 6, id(font_roboto_400_12), ${color}, TextAlign::TOP_RIGHT, "${fmt}", (float)${val});`);
-                            }
-                            let durationSec = 3600;
-                            const durMatch = duration.match(/^(\d+)([a-z]+)$/i);
-                            if (durMatch) {
-                                const v = parseInt(durMatch[1], 10);
-                                const u = durMatch[2].toLowerCase();
-                                if (u.startsWith("s")) durationSec = v;
-                                else if (u.startsWith("m")) durationSec = v * 60;
-                                else if (u.startsWith("h")) durationSec = v * 3600;
-                                else if (u.startsWith("d")) durationSec = v * 86400;
-                            }
-                            const xSteps = 2;
-                            for (let i = 0; i <= xSteps; i++) {
-                                const ratio = i / xSteps;
-                                const xOffset = Math.round(w.width * ratio);
-                                let align = "TextAlign::TOP_CENTER";
-                                if (i === 0) align = "TextAlign::TOP_LEFT";
-                                if (i === xSteps) align = "TextAlign::TOP_RIGHT";
-                                let labelText = "";
-                                if (i === xSteps) labelText = "Now";
-                                else {
-                                    const timeAgo = durationSec * (1 - ratio);
-                                    if (timeAgo >= 3600) labelText = `-${(timeAgo / 3600).toFixed(1)}h`;
-                                    else if (timeAgo >= 60) labelText = `-${(timeAgo / 60).toFixed(0)}m`;
-                                    else labelText = `-${timeAgo.toFixed(0)}s`;
-                                }
-                                lines.push(`        it.printf(${w.x} + ${xOffset}, ${w.y} + ${w.height} + 2, id(font_roboto_400_12), ${color}, ${align}, "${labelText}");`);
-                            }
-                        } else {
-                            lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
-                            lines.push(`        it.printf(${w.x}+5, ${w.y}+5, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "Graph (no entity)");`);
-                        }
-                    } else if (t === "progress_bar") {
-                        const entityId = (w.entity_id || "").trim();
-                        const title = (w.title || "").replace(/"/g, '\\"');
-                        const showLabel = p.show_label !== false;
-                        const showPercentage = p.show_percentage !== false;
-                        const barHeight = parseInt(p.bar_height || 15, 10);
-                        const borderWidth = parseInt(p.border_width || 1, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        usedFontIds.add("font_roboto_400_12"); // Progress bar uses small font for labels
+                            const sensorId = entityId ? entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") : "battery_level";
 
-                        lines.push(`        // widget:progress_bar id:${w.id} type:progress_bar x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${title}" show_label:${showLabel} show_pct:${showPercentage} bar_height:${barHeight} border:${borderWidth} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
-
-                        if (entityId) {
-                            const safeId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
-                            lines.push(`        float val_${w.id} = id(${safeId}).state;`);
-                            lines.push(`        if (std::isnan(val_${w.id})) val_${w.id} = 0;`);
-                            lines.push(`        int pct_${w.id} = (int)val_${w.id};`);
-                            lines.push(`        if (pct_${w.id} < 0) pct_${w.id} = 0;`);
-                            lines.push(`        if (pct_${w.id} > 100) pct_${w.id} = 100;`);
-                            if (showLabel && title) {
-                                lines.push(`        it.printf(${w.x}, ${w.y}, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
-                            }
-                            if (showPercentage) {
-                                lines.push(`        it.printf(${w.x} + ${w.width}, ${w.y}, id(font_roboto_400_12), ${color}, TextAlign::TOP_RIGHT, "%d%%", pct_${w.id});`);
-                            }
-                            const barY = w.y + (w.height - barHeight);
-                            lines.push(`        it.rectangle(${w.x}, ${barY}, ${w.width}, ${barHeight}, ${color});`);
-                            lines.push(`        if (pct_${w.id} > 0) {`);
-                            lines.push(`          int bar_w = (${w.width} - 4) * pct_${w.id} / 100;`);
-                            lines.push(`          it.filled_rectangle(${w.x} + 2, ${barY} + 2, bar_w, ${barHeight} - 4, ${color});`);
-                            lines.push(`        }`);
-                        } else {
-                            lines.push(`        it.rectangle(${w.x}, ${w.y} + ${w.height} - ${barHeight}, ${w.width}, ${barHeight}, ${color});`);
-                            lines.push(`        it.filled_rectangle(${w.x} + 2, ${w.y} + ${w.height} - ${barHeight} + 2, ${w.width} / 2, ${barHeight} - 4, ${color});`);
-                            if (showLabel && title) {
-                                lines.push(`        it.printf(${w.x}, ${w.y}, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
-                            }
-                        }
-                    } else if (t === "icon") {
-                        const code = (p.code || "F0595").replace(/^0x/i, "");
-                        const size = parseInt(p.size || 48, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const fontRef = `font_mdi_${size}`;
-                        lines.push(`        // widget:icon id:${w.id} type:icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} code:${code} size:${size} color:${colorProp} ${getCondProps(w)}`);
-                        lines.push(`        it.print(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000${code}");`);
-                    } else if (t === "battery_icon") {
-                        const entityId = (w.entity_id || "").trim();
-                        const size = parseInt(p.size || 24, 10);
-                        const fontSize = parseInt(p.font_size || 12, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const fontRef = `font_mdi_${size}`;
-                        const pctFontRef = `font_roboto_400_${fontSize}`;
-                        usedFontIds.add(pctFontRef);
-
-                        const sensorId = entityId ? entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") : "battery_level";
-
-                        lines.push(`        // widget:battery_icon id:${w.id} type:battery_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "battery_level"} size:${size} font_size:${fontSize} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
-                        lines.push(`        {`);
-                        lines.push(`          const char* bat_icon = "\\U000F0082"; // Default: battery-outline (unknown)`);
-                        lines.push(`          float bat_level = 0;`);
-                        lines.push(`          if (id(${sensorId}).has_state()) {`);
-                        lines.push(`            bat_level = id(${sensorId}).state;`);
-                        lines.push(`            if (std::isnan(bat_level)) bat_level = 0;`);
-                        lines.push(`            if (bat_level >= 95) bat_icon = "\\U000F0079";      // battery (full)`);
-                        lines.push(`            else if (bat_level >= 85) bat_icon = "\\U000F0082"; // battery-90`);
-                        lines.push(`            else if (bat_level >= 75) bat_icon = "\\U000F0081"; // battery-80`);
-                        lines.push(`            else if (bat_level >= 65) bat_icon = "\\U000F0080"; // battery-70`);
-                        lines.push(`            else if (bat_level >= 55) bat_icon = "\\U000F007F"; // battery-60`);
-                        lines.push(`            else if (bat_level >= 45) bat_icon = "\\U000F007E"; // battery-50`);
-                        lines.push(`            else if (bat_level >= 35) bat_icon = "\\U000F007D"; // battery-40`);
-                        lines.push(`            else if (bat_level >= 25) bat_icon = "\\U000F007C"; // battery-30`);
-                        lines.push(`            else if (bat_level >= 15) bat_icon = "\\U000F007B"; // battery-20`);
-                        lines.push(`            else if (bat_level >= 5) bat_icon = "\\U000F007A";  // battery-10`);
-                        lines.push(`            else bat_icon = "\\U000F0083";                      // battery-alert (critical)`);
-                        lines.push(`          }`);
-                        lines.push(`          it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "%s", bat_icon);`);
-                        lines.push(`          it.printf(${w.x} + ${size}/2, ${w.y} + ${size} + 2, id(${pctFontRef}), ${color}, TextAlign::TOP_CENTER, "%.0f%%", bat_level);`);
-                        lines.push(`        }`);
-                    } else if (t === "weather_icon") {
-                        const entityId = (w.entity_id || "").trim();
-                        const size = parseInt(p.size || 48, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const fontRef = `font_mdi_${size}`;
-                        lines.push(`        // widget:weather_icon id:${w.id} type:weather_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} size:${size} color:${colorProp} ${getCondProps(w)}`);
-                        if (entityId) {
-                            const safeId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
-                            // Generate dynamic weather icon mapping based on entity state
+                            lines.push(`        // widget:battery_icon id:${w.id} type:battery_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "battery_level"} size:${size} font_size:${fontSize} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
                             lines.push(`        {`);
-                            lines.push(`          std::string weather_state = id(${safeId}).state;`);
-                            lines.push(`          const char* icon = "\\U000F0599"; // Default: sunny`);
-                            lines.push(`          if (weather_state == "clear-night") icon = "\\U000F0594";`);
-                            lines.push(`          else if (weather_state == "cloudy") icon = "\\U000F0590";`);
-                            lines.push(`          else if (weather_state == "exceptional") icon = "\\U000F0026";`);
-                            lines.push(`          else if (weather_state == "fog") icon = "\\U000F0591";`);
-                            lines.push(`          else if (weather_state == "hail") icon = "\\U000F0592";`);
-                            lines.push(`          else if (weather_state == "lightning") icon = "\\U000F0593";`);
-                            lines.push(`          else if (weather_state == "lightning-rainy") icon = "\\U000F067E";`);
-                            lines.push(`          else if (weather_state == "partlycloudy") icon = "\\U000F0595";`);
-                            lines.push(`          else if (weather_state == "pouring") icon = "\\U000F0596";`);
-                            lines.push(`          else if (weather_state == "rainy") icon = "\\U000F0597";`);
-                            lines.push(`          else if (weather_state == "snowy") icon = "\\U000F0598";`);
-                            lines.push(`          else if (weather_state == "snowy-rainy") icon = "\\U000F067F";`);
-                            lines.push(`          else if (weather_state == "sunny") icon = "\\U000F0599";`);
-                            lines.push(`          else if (weather_state == "windy") icon = "\\U000F059D";`);
-                            lines.push(`          else if (weather_state == "windy-variant") icon = "\\U000F059E";`);
-                            lines.push(`          it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "%s", icon);`);
+                            lines.push(`          const char* bat_icon = "\\U000F0082"; // Default: battery-outline (unknown)`);
+                            lines.push(`          float bat_level = 0;`);
+                            lines.push(`          if (id(${sensorId}).has_state()) {`);
+                            lines.push(`            bat_level = id(${sensorId}).state;`);
+                            lines.push(`            if (std::isnan(bat_level)) bat_level = 0;`);
+                            lines.push(`            if (bat_level >= 95) bat_icon = "\\U000F0079";      // battery (full)`);
+                            lines.push(`            else if (bat_level >= 85) bat_icon = "\\U000F0082"; // battery-90`);
+                            lines.push(`            else if (bat_level >= 75) bat_icon = "\\U000F0081"; // battery-80`);
+                            lines.push(`            else if (bat_level >= 65) bat_icon = "\\U000F0080"; // battery-70`);
+                            lines.push(`            else if (bat_level >= 55) bat_icon = "\\U000F007F"; // battery-60`);
+                            lines.push(`            else if (bat_level >= 45) bat_icon = "\\U000F007E"; // battery-50`);
+                            lines.push(`            else if (bat_level >= 35) bat_icon = "\\U000F007D"; // battery-40`);
+                            lines.push(`            else if (bat_level >= 25) bat_icon = "\\U000F007C"; // battery-30`);
+                            lines.push(`            else if (bat_level >= 15) bat_icon = "\\U000F007B"; // battery-20`);
+                            lines.push(`            else if (bat_level >= 5) bat_icon = "\\U000F007A";  // battery-10`);
+                            lines.push(`            else bat_icon = "\\U000F0083";                      // battery-alert (critical)`);
+                            lines.push(`          }`);
+                            lines.push(`          it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "%s", bat_icon);`);
+                            lines.push(`          it.printf(${w.x} + ${size}/2, ${w.y} + ${size} + 2, id(${pctFontRef}), ${color}, TextAlign::TOP_CENTER, "%.0f%%", bat_level);`);
                             lines.push(`        }`);
-                        } else {
-                            lines.push(`        it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000F0595");`);
-                        }
-                    } else if (t === "qr_code") {
-                        const value = (p.value || "https://esphome.io").replace(/"/g, '\\"');
-                        const ecc = p.ecc || "LOW";
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const safeId = `qr_${w.id}`.replace(/-/g, "_");
+                        } else if (t === "weather_icon") {
+                            const entityId = (w.entity_id || "").trim();
+                            const size = parseInt(p.size || 48, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const fontRef = `font_mdi_${size}`;
+                            lines.push(`        // widget:weather_icon id:${w.id} type:weather_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} size:${size} color:${colorProp} ${getCondProps(w)}`);
+                            if (entityId) {
+                                const safeId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
+                                // Generate dynamic weather icon mapping based on entity state
+                                lines.push(`        {`);
+                                lines.push(`          std::string weather_state = id(${safeId}).state;`);
+                                lines.push(`          const char* icon = "\\U000F0599"; // Default: sunny`);
+                                lines.push(`          if (weather_state == "clear-night") icon = "\\U000F0594";`);
+                                lines.push(`          else if (weather_state == "cloudy") icon = "\\U000F0590";`);
+                                lines.push(`          else if (weather_state == "exceptional") icon = "\\U000F0026";`);
+                                lines.push(`          else if (weather_state == "fog") icon = "\\U000F0591";`);
+                                lines.push(`          else if (weather_state == "hail") icon = "\\U000F0592";`);
+                                lines.push(`          else if (weather_state == "lightning") icon = "\\U000F0593";`);
+                                lines.push(`          else if (weather_state == "lightning-rainy") icon = "\\U000F067E";`);
+                                lines.push(`          else if (weather_state == "partlycloudy") icon = "\\U000F0595";`);
+                                lines.push(`          else if (weather_state == "pouring") icon = "\\U000F0596";`);
+                                lines.push(`          else if (weather_state == "rainy") icon = "\\U000F0597";`);
+                                lines.push(`          else if (weather_state == "snowy") icon = "\\U000F0598";`);
+                                lines.push(`          else if (weather_state == "snowy-rainy") icon = "\\U000F067F";`);
+                                lines.push(`          else if (weather_state == "sunny") icon = "\\U000F0599";`);
+                                lines.push(`          else if (weather_state == "windy") icon = "\\U000F059D";`);
+                                lines.push(`          else if (weather_state == "windy-variant") icon = "\\U000F059E";`);
+                                lines.push(`          it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "%s", icon);`);
+                                lines.push(`        }`);
+                            } else {
+                                lines.push(`        it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000F0595");`);
+                            }
+                        } else if (t === "qr_code") {
+                            const value = (p.value || "https://esphome.io").replace(/"/g, '\\"');
+                            const ecc = p.ecc || "LOW";
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const safeId = `qr_${w.id}`.replace(/-/g, "_");
 
-                        // Auto-calculate scale based on widget size
-                        // QR code module count varies by content length and ECC level
-                        // Typical range: 21 (version 1) to 177 (version 40)
-                        // For a simple URL, usually around 25-33 modules
-                        // Use the smaller dimension to ensure it fits
-                        const availableSize = Math.min(w.width, w.height);
-                        // Estimate module count (21 base + ~4 per 20 chars for low ECC)
-                        const contentLen = (p.value || "https://esphome.io").length;
-                        const estimatedModules = Math.min(177, 21 + Math.ceil(contentLen / 10) * 2);
-                        const scale = Math.max(1, Math.floor(availableSize / estimatedModules));
+                            // Auto-calculate scale based on widget size
+                            // QR code module count varies by content length and ECC level
+                            // Typical range: 21 (version 1) to 177 (version 40)
+                            // For a simple URL, usually around 25-33 modules
+                            // Use the smaller dimension to ensure it fits
+                            const availableSize = Math.min(w.width, w.height);
+                            // Estimate module count (21 base + ~4 per 20 chars for low ECC)
+                            const contentLen = (p.value || "https://esphome.io").length;
+                            const estimatedModules = Math.min(177, 21 + Math.ceil(contentLen / 10) * 2);
+                            const scale = Math.max(1, Math.floor(availableSize / estimatedModules));
 
-                        lines.push(`        // widget:qr_code id:${w.id} type:qr_code x:${w.x} y:${w.y} w:${w.width} h:${w.height} value:"${value}" scale:${scale} ecc:${ecc} color:${colorProp} ${getCondProps(w)}`);
-                        lines.push(`        it.qr_code(${w.x}, ${w.y}, id(${safeId}), ${color}, ${scale});`);
-                    } else if (t === "quote_rss") {
-                        // Quote/RSS widget - display quote text with optional author
-                        const feedUrl = p.feed_url || "https://www.brainyquote.com/link/quotebr.rss";
-                        const showAuthor = p.show_author !== false;
-                        const quoteFontSize = parseInt(p.quote_font_size || 18, 10);
-                        const authorFontSize = parseInt(p.author_font_size || 14, 10);
-                        const fontFamily = p.font_family || "Roboto";
-                        const fontWeight = parseInt(p.font_weight || 400, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const textAlign = p.text_align || "TOP_LEFT";
-                        const wordWrap = p.word_wrap !== false;
-                        const italicQuote = p.italic_quote !== false;
-                        const refreshInterval = p.refresh_interval || "1h";
-                        const randomQuote = p.random !== false;
-                        const autoScale = p.auto_scale || false;
+                            lines.push(`        // widget:qr_code id:${w.id} type:qr_code x:${w.x} y:${w.y} w:${w.width} h:${w.height} value:"${value}" scale:${scale} ecc:${ecc} color:${colorProp} ${getCondProps(w)}`);
+                            lines.push(`        it.qr_code(${w.x}, ${w.y}, id(${safeId}), ${color}, ${scale});`);
+                        } else if (t === "quote_rss") {
+                            // Quote/RSS widget - display quote text with optional author
+                            const feedUrl = p.feed_url || "https://www.brainyquote.com/link/quotebr.rss";
+                            const showAuthor = p.show_author !== false;
+                            const quoteFontSize = parseInt(p.quote_font_size || 18, 10);
+                            const authorFontSize = parseInt(p.author_font_size || 14, 10);
+                            const fontFamily = p.font_family || "Roboto";
+                            const fontWeight = parseInt(p.font_weight || 400, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const textAlign = p.text_align || "TOP_LEFT";
+                            const wordWrap = p.word_wrap !== false;
+                            const italicQuote = p.italic_quote !== false;
+                            const refreshInterval = p.refresh_interval || "1h";
+                            const randomQuote = p.random !== false;
+                            const autoScale = p.auto_scale || false;
 
-                        // Font sizes for auto-scale (100%, 75%, 50%)
-                        const size1 = quoteFontSize;
-                        const size2 = Math.max(8, Math.floor(size1 * 0.75));
-                        const size3 = Math.max(8, Math.floor(size1 * 0.50));
+                            // Font sizes for auto-scale (100%, 75%, 50%)
+                            const size1 = quoteFontSize;
+                            const size2 = Math.max(8, Math.floor(size1 * 0.75));
+                            const size3 = Math.max(8, Math.floor(size1 * 0.50));
 
-                        // Register fonts
-                        addFont(fontFamily, fontWeight, size1, italicQuote);
-                        if (autoScale) {
-                            addFont(fontFamily, fontWeight, size2, italicQuote);
-                            addFont(fontFamily, fontWeight, size3, italicQuote);
-                        }
-                        if (showAuthor) {
-                            addFont(fontFamily, fontWeight, authorFontSize, false);
-                        }
-
-                        // Generate font IDs
-                        const safeFamily = fontFamily.replace(/\s+/g, "_").toLowerCase();
-                        const quoteItalicSuffix = italicQuote ? "_italic" : "";
-                        const getQId = (s) => `font_${safeFamily}_${fontWeight}_${s}${quoteItalicSuffix}`;
-                        const quoteFontId1 = getQId(size1);
-                        const quoteFontId2 = getQId(size2);
-                        const quoteFontId3 = getQId(size3);
-                        const authorFontId = `font_${safeFamily}_${fontWeight}_${authorFontSize}`;
-
-                        // Sensor IDs
-                        const quoteTextId = `quote_text_${w.id}`.replace(/-/g, "_");
-                        const quoteAuthorId = `quote_author_${w.id}`.replace(/-/g, "_");
-                        const alignX = getAlignX(textAlign, w.x, w.width);
-                        const alignY = getAlignY(textAlign, w.y, w.height);
-                        const espAlign = `TextAlign::${textAlign}`;
-
-                        lines.push(`        // widget:quote_rss id:${w.id} type:quote_rss x:${w.x} y:${w.y} w:${w.width} h:${w.height} feed_url:"${feedUrl}" show_author:${showAuthor} quote_font_size:${quoteFontSize} author_font_size:${authorFontSize} font_family:"${fontFamily}" weight:${fontWeight} color:${colorProp} align:${textAlign} word_wrap:${wordWrap} italic_quote:${italicQuote} refresh_interval:${refreshInterval} random:${randomQuote} auto_scale:${autoScale} ${getCondProps(w)}`);
-                        lines.push(`        {`);
-                        lines.push(`          std::string quote_text = id(${quoteTextId}_global);`);
-                        if (showAuthor) {
-                            lines.push(`          std::string quote_author = id(${quoteAuthorId}_global);`);
-                        }
-                        lines.push(``);
-
-                        if (wordWrap) {
-                            const maxWidth = w.width - 16;
-                            lines.push(`          int max_width = ${maxWidth};`);
-                            lines.push(`          int y_start = ${w.y + 8};`);
-                            lines.push(`          int x_pos = ${w.x + 8};`);
-                            lines.push(`          int max_height = ${w.height - 16 - (showAuthor ? (authorFontSize + 8) : 0)};`);
-                            lines.push(`          std::string display_text = "\\"" + quote_text + "\\"";`);
-
-                            // Define C++ lambda for printing/measuring
-                            lines.push(`          auto print_quote = [&](esphome::font::Font *font, int line_h, bool draw) -> int {`);
-                            lines.push(`            int y_curr = y_start;`);
-                            lines.push(`            std::string current_line = "";`);
-                            lines.push(`            size_t pos = 0;`);
-                            lines.push(`            size_t space_pos;`);
-                            lines.push(`            while ((space_pos = display_text.find(' ', pos)) != std::string::npos) {`);
-                            lines.push(`                std::string word = display_text.substr(pos, space_pos - pos);`);
-                            lines.push(`                std::string test_line = current_line.empty() ? word : current_line + " " + word;`);
-                            lines.push(`                int w, h, xoff, bl;`);
-                            lines.push(`                font->measure(test_line.c_str(), &w, &xoff, &bl, &h);`);
-                            lines.push(`                if (w > max_width && !current_line.empty()) {`);
-                            lines.push(`                    if (draw) it.printf(x_pos, y_curr, font, ${color}, "%s", current_line.c_str());`);
-                            lines.push(`                    y_curr += line_h;`);
-                            lines.push(`                    current_line = word;`);
-                            lines.push(`                } else {`);
-                            lines.push(`                    current_line = test_line;`);
-                            lines.push(`                }`);
-                            lines.push(`                pos = space_pos + 1;`);
-                            lines.push(`            }`);
-                            lines.push(`            if (!current_line.empty()) {`);
-                            lines.push(`                std::string rem = display_text.substr(pos);`);
-                            lines.push(`                if (!current_line.empty()) current_line += " ";`);
-                            lines.push(`                current_line += rem;`);
-                            lines.push(`            }`);
-                            lines.push(`            if (!current_line.empty()) {`);
-                            lines.push(`                if (draw) it.printf(x_pos, y_curr, font, ${color}, "%s", current_line.c_str());`);
-                            lines.push(`                y_curr += line_h;`);
-                            lines.push(`            }`);
-                            lines.push(`            return y_curr - y_start;`);
-                            lines.push(`          };`);
-
-                            // Selection logic
-                            lines.push(``);
+                            // Register fonts
+                            addFont(fontFamily, fontWeight, size1, italicQuote);
                             if (autoScale) {
-                                lines.push(`          // Auto-scale logic`);
-                                lines.push(`          esphome::font::Font *selected_font = id(${quoteFontId1});`);
-                                lines.push(`          int lh = ${Math.ceil(size1 * 1.3)};`);
-                                lines.push(`          if (print_quote(selected_font, lh, false) > max_height) {`);
-                                lines.push(`              selected_font = id(${quoteFontId2});`);
-                                lines.push(`              lh = ${Math.ceil(size2 * 1.3)};`);
-                                lines.push(`              if (print_quote(selected_font, lh, false) > max_height) {`);
-                                lines.push(`                  selected_font = id(${quoteFontId3});`);
-                                lines.push(`                  lh = ${Math.ceil(size3 * 1.3)};`);
-                                lines.push(`              }`);
-                                lines.push(`          }`);
-                                lines.push(`          int final_h = print_quote(selected_font, lh, true);`);
-                            } else {
-                                lines.push(`          int final_h = print_quote(id(${quoteFontId1}), ${Math.ceil(size1 * 1.3)}, true);`);
+                                addFont(fontFamily, fontWeight, size2, italicQuote);
+                                addFont(fontFamily, fontWeight, size3, italicQuote);
                             }
-
                             if (showAuthor) {
-                                lines.push(``);
-                                lines.push(`          // Draw author below quote`);
-                                lines.push(`          if (!quote_author.empty()) {`);
-                                lines.push(`            int author_y = y_start + final_h + 4;`);
-                                lines.push(`            it.printf(x_pos, author_y, id(${authorFontId}), ${color}, "— %s", quote_author.c_str());`);
-                                lines.push(`          }`);
+                                addFont(fontFamily, fontWeight, authorFontSize, false);
                             }
 
-                        } else {
-                            // No word wrap - simple single line
-                            lines.push(`          it.printf(${alignX}, ${alignY}, id(${quoteFontId1}), ${color}, ${espAlign}, "\\"%s\\"", quote_text.c_str());`);
+                            // Generate font IDs
+                            const safeFamily = fontFamily.replace(/\s+/g, "_").toLowerCase();
+                            const quoteItalicSuffix = italicQuote ? "_italic" : "";
+                            const getQId = (s) => `font_${safeFamily}_${fontWeight}_${s}${quoteItalicSuffix}`;
+                            const quoteFontId1 = getQId(size1);
+                            const quoteFontId2 = getQId(size2);
+                            const quoteFontId3 = getQId(size3);
+                            const authorFontId = `font_${safeFamily}_${fontWeight}_${authorFontSize}`;
+
+                            // Sensor IDs
+                            const quoteTextId = `quote_text_${w.id}`.replace(/-/g, "_");
+                            const quoteAuthorId = `quote_author_${w.id}`.replace(/-/g, "_");
+                            const alignX = getAlignX(textAlign, w.x, w.width);
+                            const alignY = getAlignY(textAlign, w.y, w.height);
+                            const espAlign = `TextAlign::${textAlign}`;
+
+                            lines.push(`        // widget:quote_rss id:${w.id} type:quote_rss x:${w.x} y:${w.y} w:${w.width} h:${w.height} feed_url:"${feedUrl}" show_author:${showAuthor} quote_font_size:${quoteFontSize} author_font_size:${authorFontSize} font_family:"${fontFamily}" weight:${fontWeight} color:${colorProp} align:${textAlign} word_wrap:${wordWrap} italic_quote:${italicQuote} refresh_interval:${refreshInterval} random:${randomQuote} auto_scale:${autoScale} ${getCondProps(w)}`);
+                            lines.push(`        {`);
+                            lines.push(`          std::string quote_text = id(${quoteTextId}_global);`);
                             if (showAuthor) {
-                                lines.push(`          if (!quote_author.empty()) {`);
-                                lines.push(`            it.printf(${alignX}, ${alignY + quoteFontSize + 4}, id(${authorFontId}), ${color}, ${espAlign}, "— %s", quote_author.c_str());`);
-                                lines.push(`          }`);
+                                lines.push(`          std::string quote_author = id(${quoteAuthorId}_global);`);
                             }
-                        }
-                        lines.push(`        }`);
-                    } else if (t === "weather_forecast") {
-                        // Weather Forecast widget - displays 5-day forecast with icons and temps
-                        const weatherEntity = w.entity_id || p.weather_entity || "weather.forecast_home";
-                        const layout = p.layout || "horizontal";
-                        const showHighLow = p.show_high_low !== false;
-                        const dayFontSize = parseInt(p.day_font_size || 14, 10);
-                        const tempFontSize = parseInt(p.temp_font_size || 14, 10);
-                        const iconSize = parseInt(p.icon_size || 32, 10);
-                        const fontFamily = p.font_family || "Roboto";
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-
-                        // Font IDs
-                        const safeFontFamily = fontFamily.replace(/\s+/g, "_").toLowerCase();
-                        const dayFontId = `font_${safeFontFamily}_700_${dayFontSize}`;
-                        const tempFontId = `font_${safeFontFamily}_400_${tempFontSize}`;
-                        const iconFontId = `font_mdi_${iconSize}`;
-
-                        lines.push(`        // widget:weather_forecast id:${w.id} type:weather_forecast x:${w.x} y:${w.y} w:${w.width} h:${w.height} weather_entity:"${weatherEntity}" layout:${layout} show_high_low:${showHighLow} day_font_size:${dayFontSize} temp_font_size:${tempFontSize} icon_size:${iconSize} font_family:"${fontFamily}" color:${colorProp} ${getCondProps(w)}`);
-                        lines.push(`        {`);
-                        lines.push(`          // Weather condition to MDI icon mapping`);
-                        lines.push(`          static std::map<std::string, const char*> weather_icons = {`);
-                        lines.push(`            {"clear-night", "\\U000F0594"}, {"cloudy", "\\U000F0590"},`);
-                        lines.push(`            {"exceptional", "\\U000F0026"}, {"fog", "\\U000F0591"},`);
-                        lines.push(`            {"hail", "\\U000F0592"}, {"lightning", "\\U000F0593"},`);
-                        lines.push(`            {"lightning-rainy", "\\U000F067E"}, {"partlycloudy", "\\U000F0595"},`);
-                        lines.push(`            {"pouring", "\\U000F0596"}, {"rainy", "\\U000F0597"},`);
-                        lines.push(`            {"snowy", "\\U000F0598"}, {"snowy-rainy", "\\U000F067F"},`);
-                        lines.push(`            {"sunny", "\\U000F0599"}, {"windy", "\\U000F059D"},`);
-                        lines.push(`            {"windy-variant", "\\U000F059E"}`);
-                        lines.push(`          };`);
-                        lines.push(``);
-                        lines.push(`          auto get_icon = [&](const std::string& cond) -> const char* {`);
-                        lines.push(`            return weather_icons.count(cond) ? weather_icons[cond] : "\\U000F0590";`);
-                        lines.push(`          };`);
-                        lines.push(``);
-                        lines.push(`          auto get_day_name = [](int offset) -> std::string {`);
-                        lines.push(`            if (offset == 0) return "Today";`);
-                        lines.push(`            auto t = id(ha_time).now();`);
-                        lines.push(`            if (!t.is_valid()) return "---";`);
-                        lines.push(`            ESPTime future = ESPTime::from_epoch_local(t.timestamp + (offset * 86400));`);
-                        lines.push(`            char buf[8]; future.strftime(buf, sizeof(buf), "%a");`);
-                        lines.push(`            return std::string(buf);`);
-                        lines.push(`          };`);
-                        lines.push(``);
-
-                        // Calculate layout increments and center offset
-                        const isHorizontal = layout === "horizontal";
-                        const xInc = isHorizontal ? Math.floor(w.width / 5) : 0;
-                        const yInc = isHorizontal ? 0 : Math.floor(w.height / 5);
-                        const centerOffset = isHorizontal ? Math.floor(xInc / 2) : Math.floor(w.width / 2);
-
-                        lines.push(`          int x_inc = ${xInc};`);
-                        lines.push(`          int y_inc = ${yInc};`);
-                        lines.push(`          int center_offset = ${centerOffset};`);
-                        lines.push(``);
-
-                        // Generate rendering for each day (0-4)
-                        for (let day = 0; day < 5; day++) {
-                            const safeEntityBase = weatherEntity.replace(/\./g, "_").replace(/-/g, "_");
-                            const condSensorId = `weather_cond_day${day}`;
-                            const highSensorId = `weather_high_day${day}`;
-                            const lowSensorId = `weather_low_day${day}`;
-
-                            // Calculate absolute positions for this day at generation time
-                            const dayX = w.x + day * xInc;
-                            const dayY = w.y + day * yInc;
-                            const centerX = dayX + centerOffset;
-
-                            lines.push(`          // Day ${day}`);
-                            lines.push(`          {`);
-                            lines.push(`            int dx = ${dayX};`);
-                            lines.push(`            int dy = ${dayY};`);
                             lines.push(``);
-                            lines.push(`            // Day name (centered)`);
-                            lines.push(`            it.printf(dx + center_offset, dy, id(${dayFontId}), ${color}, TextAlign::TOP_CENTER, "%s", get_day_name(${day}).c_str());`);
-                            lines.push(``);
-                            lines.push(`            // Weather icon (centered)`);
-                            lines.push(`            std::string cond = id(${condSensorId}).state;`);
-                            lines.push(`            it.printf(dx + center_offset, dy + ${dayFontSize + 4}, id(${iconFontId}), ${color}, TextAlign::TOP_CENTER, "%s", get_icon(cond));`);
 
-                            if (showHighLow) {
-                                lines.push(``);
-                                lines.push(`            // High/Low temps (centered)`);
-                                lines.push(`            float high = id(${highSensorId}).state;`);
-                                lines.push(`            float low = id(${lowSensorId}).state;`);
-                                lines.push(`            if (!std::isnan(high) && !std::isnan(low)) {`);
-                                lines.push(`              it.printf(dx + center_offset, dy + ${dayFontSize + iconSize + 8}, id(${tempFontId}), ${color}, TextAlign::TOP_CENTER, "%.0f/%.0f", high, low);`);
-                                lines.push(`            }`);
-                            }
-                            lines.push(`          }`);
-                        }
-                        lines.push(`        }`);
-                    } else if (t === "rounded_rect") {
-                        const fill = !!p.fill;
-                        // Default show_border to true if not explicitly false
-                        const showBorder = p.show_border !== false;
-                        const r = parseInt(p.radius || 10, 10);
-                        const thickness = parseInt(p.border_width || 4, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const isGray = colorProp.toLowerCase() === "gray";
+                            if (wordWrap) {
+                                const maxWidth = w.width - 16;
+                                lines.push(`          int max_width = ${maxWidth};`);
+                                lines.push(`          int y_start = ${w.y + 8};`);
+                                lines.push(`          int x_pos = ${w.x + 8};`);
+                                lines.push(`          int max_height = ${w.height - 16 - (showAuthor ? (authorFontSize + 8) : 0)};`);
+                                lines.push(`          std::string display_text = "\\"" + quote_text + "\\"";`);
 
-                        // Limit radius to half geometric size
-                        lines.push(`        // widget:rounded_rect id:${w.id} type:rounded_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} show_border:${showBorder} border:${thickness} radius:${r} color:${colorProp} ${getCondProps(w)}`);
-                        lines.push(`        {`);
-                        lines.push(`          int r = ${r};`);
-                        lines.push(`          int w = ${w.width};`);
-                        lines.push(`          int h = ${w.height};`);
-                        lines.push(`          if (r > w/2) r = w/2;`);
-                        lines.push(`          if (r > h/2) r = h/2;`);
-                        lines.push(``);
-                        lines.push(`          auto draw_rrect = [&](int x, int y, int w, int h, int r, auto c) {`);
-                        lines.push(`            // Center vertical strip`);
-                        lines.push(`            it.filled_rectangle(x + r, y, w - 2 * r, h, c);`);
-                        lines.push(`            // Left side (between corners)`);
-                        lines.push(`            it.filled_rectangle(x, y + r, r, h - 2 * r, c);`);
-                        lines.push(`            // Right side (between corners)`);
-                        lines.push(`            it.filled_rectangle(x + w - r, y + r, r, h - 2 * r, c);`);
-                        lines.push(`            // Corners`);
-                        lines.push(`            it.filled_circle(x + r, y + r, r, c);`);
-                        lines.push(`            it.filled_circle(x + w - r, y + r, r, c);`);
-                        lines.push(`            it.filled_circle(x + r, y + h - r, r, c);`);
-                        lines.push(`            it.filled_circle(x + w - r, y + h - r, r, c);`);
-                        lines.push(`          };`);
-                        lines.push(``); // Blank line
-
-                        if (fill) {
-                            let fx = w.x, fy = w.y, fw = w.width, fh = w.height, fr = r;
-
-                            if (showBorder) {
-                                lines.push(`          // Draw Black Border (Outer)`);
-                                lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, COLOR_ON);`);
-
-                                // Shrink for fill
-                                const t = thickness;
-                                fx += t; fy += t; fw -= 2 * t; fh -= 2 * t; fr -= t;
-                                if (fr < 0) fr = 0;
-
-                                if (isGray && fw > 0 && fh > 0) {
-                                    lines.push(`          // Clear inner for dithering`);
-                                    lines.push(`          draw_rrect(${fx}, ${fy}, ${fw}, ${fh}, ${fr}, COLOR_OFF);`);
-                                }
-                            }
-
-                            if (isGray) {
-                                lines.push(`          // Gray fill using 50% checkerboard dithering`);
-                                // Need to perform loop on adjusted coordinates
-                                // If showBorder, the indices change.
-                                // C++ Code generation:
-                                lines.push(`          int fx = ${fx}; int fy = ${fy}; int fw = ${fw}; int fh = ${fh}; int fr = ${fr};`); // Use interpolated JS values
-                                lines.push(`          if (fw > 0 && fh > 0) {`);
-                                lines.push(`            for (int dy = 0; dy < fh; dy++) {`);
-                                lines.push(`              for (int dx = 0; dx < fw; dx++) {`);
-                                lines.push(`                if ((fx + dx + fy + dy) % 2 != 0) continue;`); // Global dithering alignment
-                                lines.push(`                bool inside = false;`);
-                                lines.push(`                if ((dx >= fr && dx < fw - fr) || (dy >= fr && dy < fh - fr)) {`);
-                                lines.push(`                  inside = true;`);
+                                // Define C++ lambda for printing/measuring
+                                lines.push(`          auto print_quote = [&](esphome::font::Font *font, int line_h, bool draw) -> int {`);
+                                lines.push(`            int y_curr = y_start;`);
+                                lines.push(`            std::string current_line = "";`);
+                                lines.push(`            size_t pos = 0;`);
+                                lines.push(`            size_t space_pos;`);
+                                lines.push(`            while ((space_pos = display_text.find(' ', pos)) != std::string::npos) {`);
+                                lines.push(`                std::string word = display_text.substr(pos, space_pos - pos);`);
+                                lines.push(`                std::string test_line = current_line.empty() ? word : current_line + " " + word;`);
+                                lines.push(`                int w, h, xoff, bl;`);
+                                lines.push(`                font->measure(test_line.c_str(), &w, &xoff, &bl, &h);`);
+                                lines.push(`                if (w > max_width && !current_line.empty()) {`);
+                                lines.push(`                    if (draw) it.printf(x_pos, y_curr, font, ${color}, "%s", current_line.c_str());`);
+                                lines.push(`                    y_curr += line_h;`);
+                                lines.push(`                    current_line = word;`);
                                 lines.push(`                } else {`);
-                                lines.push(`                  int cx = (dx < fr) ? fr : fw - fr;`);
-                                lines.push(`                  int cy = (dy < fr) ? fr : fh - fr;`);
-                                lines.push(`                  if ((dx - cx)*(dx - cx) + (dy - cy)*(dy - cy) < fr*fr) inside = true;`);
+                                lines.push(`                    current_line = test_line;`);
                                 lines.push(`                }`);
-                                lines.push(`                if (inside) it.draw_pixel_at(fx + dx, fy + dy, COLOR_ON);`);
-                                lines.push(`              }`);
+                                lines.push(`                pos = space_pos + 1;`);
                                 lines.push(`            }`);
-                                lines.push(`          }`);
-                            } else {
-                                // Solid Color Fill
-                                lines.push(`          // Fill Inner`);
-                                if (showBorder) {
-                                    // Use interpolated values
-                                    lines.push(`          if (${fw} > 0 && ${fh} > 0) draw_rrect(${fx}, ${fy}, ${fw}, ${fh}, ${fr}, ${color});`);
+                                lines.push(`            if (!current_line.empty()) {`);
+                                lines.push(`                std::string rem = display_text.substr(pos);`);
+                                lines.push(`                if (!current_line.empty()) current_line += " ";`);
+                                lines.push(`                current_line += rem;`);
+                                lines.push(`            }`);
+                                lines.push(`            if (!current_line.empty()) {`);
+                                lines.push(`                if (draw) it.printf(x_pos, y_curr, font, ${color}, "%s", current_line.c_str());`);
+                                lines.push(`                y_curr += line_h;`);
+                                lines.push(`            }`);
+                                lines.push(`            return y_curr - y_start;`);
+                                lines.push(`          };`);
+
+                                // Selection logic
+                                lines.push(``);
+                                if (autoScale) {
+                                    lines.push(`          // Auto-scale logic`);
+                                    lines.push(`          esphome::font::Font *selected_font = id(${quoteFontId1});`);
+                                    lines.push(`          int lh = ${Math.ceil(size1 * 1.3)};`);
+                                    lines.push(`          if (print_quote(selected_font, lh, false) > max_height) {`);
+                                    lines.push(`              selected_font = id(${quoteFontId2});`);
+                                    lines.push(`              lh = ${Math.ceil(size2 * 1.3)};`);
+                                    lines.push(`              if (print_quote(selected_font, lh, false) > max_height) {`);
+                                    lines.push(`                  selected_font = id(${quoteFontId3});`);
+                                    lines.push(`                  lh = ${Math.ceil(size3 * 1.3)};`);
+                                    lines.push(`              }`);
+                                    lines.push(`          }`);
+                                    lines.push(`          int final_h = print_quote(selected_font, lh, true);`);
                                 } else {
-                                    // No border, just draw full
-                                    lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, ${color});`);
+                                    lines.push(`          int final_h = print_quote(id(${quoteFontId1}), ${Math.ceil(size1 * 1.3)}, true);`);
+                                }
+
+                                if (showAuthor) {
+                                    lines.push(``);
+                                    lines.push(`          // Draw author below quote`);
+                                    lines.push(`          if (!quote_author.empty()) {`);
+                                    lines.push(`            int author_y = y_start + final_h + 4;`);
+                                    lines.push(`            it.printf(x_pos, author_y, id(${authorFontId}), ${color}, "— %s", quote_author.c_str());`);
+                                    lines.push(`          }`);
+                                }
+
+                            } else {
+                                // No word wrap - simple single line
+                                lines.push(`          it.printf(${alignX}, ${alignY}, id(${quoteFontId1}), ${color}, ${espAlign}, "\\"%s\\"", quote_text.c_str());`);
+                                if (showAuthor) {
+                                    lines.push(`          if (!quote_author.empty()) {`);
+                                    lines.push(`            it.printf(${alignX}, ${alignY + quoteFontSize + 4}, id(${authorFontId}), ${color}, ${espAlign}, "— %s", quote_author.c_str());`);
+                                    lines.push(`          }`);
                                 }
                             }
-                        } else {
-                            // Outline Mode
-                            lines.push(`          // Draw Outer`);
-                            lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, ${color});`);
-                            lines.push(`          // Erase center to create outline`);
-                            lines.push(`          int t = ${thickness};`);
-                            lines.push(`          int ir = r - t; if (ir < 0) ir = 0;`);
-                            lines.push(`          draw_rrect(${w.x} + t, ${w.y} + t, w - 2*t, h - 2*t, ir, COLOR_OFF);`);
-                        }
+                            lines.push(`        }`);
+                        } else if (t === "weather_forecast") {
+                            // Weather Forecast widget - displays 5-day forecast with icons and temps
+                            const weatherEntity = w.entity_id || p.weather_entity || "weather.forecast_home";
+                            const layout = p.layout || "horizontal";
+                            const showHighLow = p.show_high_low !== false;
+                            const dayFontSize = parseInt(p.day_font_size || 14, 10);
+                            const tempFontSize = parseInt(p.temp_font_size || 14, 10);
+                            const iconSize = parseInt(p.icon_size || 32, 10);
+                            const fontFamily = p.font_family || "Roboto";
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
 
-                        lines.push(`        }`);
+                            // Font IDs
+                            const safeFontFamily = fontFamily.replace(/\s+/g, "_").toLowerCase();
+                            const dayFontId = `font_${safeFontFamily}_700_${dayFontSize}`;
+                            const tempFontId = `font_${safeFontFamily}_400_${tempFontSize}`;
+                            const iconFontId = `font_mdi_${iconSize}`;
 
-                    } else if (t === "shape_rect") {
-                        const fill = !!p.fill;
-                        const borderWidth = parseInt(p.border_width || 1, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const opacity = parseInt(p.opacity || 100, 10);
-                        const isGray = colorProp.toLowerCase() === "gray";
-                        const rectY = w.y + RECT_Y_OFFSET;
-                        lines.push(`        // widget:shape_rect id:${w.id} type:shape_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
-                        if (fill) {
-                            if (isGray) {
-                                // Gray: use 50% checkerboard dithering pattern
-                                lines.push(`        // Gray fill using 50% checkerboard dithering pattern`);
-                                lines.push(`        for (int dy = 0; dy < ${w.height}; dy++) {`);
-                                lines.push(`          for (int dx = 0; dx < ${w.width}; dx++) {`);
-                                lines.push(`            if ((dx + dy) % 2 == 0) {`);
-                                lines.push(`              it.draw_pixel_at(${w.x}+dx, ${rectY}+dy, COLOR_ON);`);
-                                lines.push(`            }`);
+                            lines.push(`        // widget:weather_forecast id:${w.id} type:weather_forecast x:${w.x} y:${w.y} w:${w.width} h:${w.height} weather_entity:"${weatherEntity}" layout:${layout} show_high_low:${showHighLow} day_font_size:${dayFontSize} temp_font_size:${tempFontSize} icon_size:${iconSize} font_family:"${fontFamily}" color:${colorProp} ${getCondProps(w)}`);
+                            lines.push(`        {`);
+                            lines.push(`          // Weather condition to MDI icon mapping`);
+                            lines.push(`          static std::map<std::string, const char*> weather_icons = {`);
+                            lines.push(`            {"clear-night", "\\U000F0594"}, {"cloudy", "\\U000F0590"},`);
+                            lines.push(`            {"exceptional", "\\U000F0026"}, {"fog", "\\U000F0591"},`);
+                            lines.push(`            {"hail", "\\U000F0592"}, {"lightning", "\\U000F0593"},`);
+                            lines.push(`            {"lightning-rainy", "\\U000F067E"}, {"partlycloudy", "\\U000F0595"},`);
+                            lines.push(`            {"pouring", "\\U000F0596"}, {"rainy", "\\U000F0597"},`);
+                            lines.push(`            {"snowy", "\\U000F0598"}, {"snowy-rainy", "\\U000F067F"},`);
+                            lines.push(`            {"sunny", "\\U000F0599"}, {"windy", "\\U000F059D"},`);
+                            lines.push(`            {"windy-variant", "\\U000F059E"}`);
+                            lines.push(`          };`);
+                            lines.push(``);
+                            lines.push(`          auto get_icon = [&](const std::string& cond) -> const char* {`);
+                            lines.push(`            return weather_icons.count(cond) ? weather_icons[cond] : "\\U000F0590";`);
+                            lines.push(`          };`);
+                            lines.push(``);
+                            lines.push(`          auto get_day_name = [](int offset) -> std::string {`);
+                            lines.push(`            if (offset == 0) return "Today";`);
+                            lines.push(`            auto t = id(ha_time).now();`);
+                            lines.push(`            if (!t.is_valid()) return "---";`);
+                            lines.push(`            ESPTime future = ESPTime::from_epoch_local(t.timestamp + (offset * 86400));`);
+                            lines.push(`            char buf[8]; future.strftime(buf, sizeof(buf), "%a");`);
+                            lines.push(`            return std::string(buf);`);
+                            lines.push(`          };`);
+                            lines.push(``);
+
+                            // Calculate layout increments and center offset
+                            const isHorizontal = layout === "horizontal";
+                            const xInc = isHorizontal ? Math.floor(w.width / 5) : 0;
+                            const yInc = isHorizontal ? 0 : Math.floor(w.height / 5);
+                            const centerOffset = isHorizontal ? Math.floor(xInc / 2) : Math.floor(w.width / 2);
+
+                            lines.push(`          int x_inc = ${xInc};`);
+                            lines.push(`          int y_inc = ${yInc};`);
+                            lines.push(`          int center_offset = ${centerOffset};`);
+                            lines.push(``);
+
+                            // Generate rendering for each day (0-4)
+                            for (let day = 0; day < 5; day++) {
+                                const safeEntityBase = weatherEntity.replace(/\./g, "_").replace(/-/g, "_");
+                                const condSensorId = `weather_cond_day${day}`;
+                                const highSensorId = `weather_high_day${day}`;
+                                const lowSensorId = `weather_low_day${day}`;
+
+                                // Calculate absolute positions for this day at generation time
+                                const dayX = w.x + day * xInc;
+                                const dayY = w.y + day * yInc;
+                                const centerX = dayX + centerOffset;
+
+                                lines.push(`          // Day ${day}`);
+                                lines.push(`          {`);
+                                lines.push(`            int dx = ${dayX};`);
+                                lines.push(`            int dy = ${dayY};`);
+                                lines.push(``);
+                                lines.push(`            // Day name (centered)`);
+                                lines.push(`            it.printf(dx + center_offset, dy, id(${dayFontId}), ${color}, TextAlign::TOP_CENTER, "%s", get_day_name(${day}).c_str());`);
+                                lines.push(``);
+                                lines.push(`            // Weather icon (centered)`);
+                                lines.push(`            std::string cond = id(${condSensorId}).state;`);
+                                lines.push(`            it.printf(dx + center_offset, dy + ${dayFontSize + 4}, id(${iconFontId}), ${color}, TextAlign::TOP_CENTER, "%s", get_icon(cond));`);
+
+                                if (showHighLow) {
+                                    lines.push(``);
+                                    lines.push(`            // High/Low temps (centered)`);
+                                    lines.push(`            float high = id(${highSensorId}).state;`);
+                                    lines.push(`            float low = id(${lowSensorId}).state;`);
+                                    lines.push(`            if (!std::isnan(high) && !std::isnan(low)) {`);
+                                    lines.push(`              it.printf(dx + center_offset, dy + ${dayFontSize + iconSize + 8}, id(${tempFontId}), ${color}, TextAlign::TOP_CENTER, "%.0f/%.0f", high, low);`);
+                                    lines.push(`            }`);
+                                }
                                 lines.push(`          }`);
-                                lines.push(`        }`);
-                            } else {
-                                lines.push(`        it.filled_rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
                             }
-                        } else {
-                            if (borderWidth <= 1) {
-                                lines.push(`        it.rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
+                            lines.push(`        }`);
+                        } else if (t === "rounded_rect") {
+                            const fill = !!p.fill;
+                            // Default show_border to true if not explicitly false
+                            const showBorder = p.show_border !== false;
+                            const r = parseInt(p.radius || 10, 10);
+                            const thickness = parseInt(p.border_width || 4, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const isGray = colorProp.toLowerCase() === "gray";
+
+                            // Limit radius to half geometric size
+                            lines.push(`        // widget:rounded_rect id:${w.id} type:rounded_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} show_border:${showBorder} border:${thickness} radius:${r} color:${colorProp} ${getCondProps(w)}`);
+                            lines.push(`        {`);
+                            lines.push(`          int r = ${r};`);
+                            lines.push(`          int w = ${w.width};`);
+                            lines.push(`          int h = ${w.height};`);
+                            lines.push(`          if (r > w/2) r = w/2;`);
+                            lines.push(`          if (r > h/2) r = h/2;`);
+                            lines.push(``);
+                            lines.push(`          auto draw_rrect = [&](int x, int y, int w, int h, int r, auto c) {`);
+                            lines.push(`            // Center vertical strip`);
+                            lines.push(`            it.filled_rectangle(x + r, y, w - 2 * r, h, c);`);
+                            lines.push(`            // Left side (between corners)`);
+                            lines.push(`            it.filled_rectangle(x, y + r, r, h - 2 * r, c);`);
+                            lines.push(`            // Right side (between corners)`);
+                            lines.push(`            it.filled_rectangle(x + w - r, y + r, r, h - 2 * r, c);`);
+                            lines.push(`            // Corners`);
+                            lines.push(`            it.filled_circle(x + r, y + r, r, c);`);
+                            lines.push(`            it.filled_circle(x + w - r, y + r, r, c);`);
+                            lines.push(`            it.filled_circle(x + r, y + h - r, r, c);`);
+                            lines.push(`            it.filled_circle(x + w - r, y + h - r, r, c);`);
+                            lines.push(`          };`);
+                            lines.push(``); // Blank line
+
+                            if (fill) {
+                                let fx = w.x, fy = w.y, fw = w.width, fh = w.height, fr = r;
+
+                                if (showBorder) {
+                                    lines.push(`          // Draw Black Border (Outer)`);
+                                    lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, COLOR_ON);`);
+
+                                    // Shrink for fill
+                                    const t = thickness;
+                                    fx += t; fy += t; fw -= 2 * t; fh -= 2 * t; fr -= t;
+                                    if (fr < 0) fr = 0;
+
+                                    if (isGray && fw > 0 && fh > 0) {
+                                        lines.push(`          // Clear inner for dithering`);
+                                        lines.push(`          draw_rrect(${fx}, ${fy}, ${fw}, ${fh}, ${fr}, COLOR_OFF);`);
+                                    }
+                                }
+
+                                if (isGray) {
+                                    lines.push(`          // Gray fill using 50% checkerboard dithering`);
+                                    // Need to perform loop on adjusted coordinates
+                                    // If showBorder, the indices change.
+                                    // C++ Code generation:
+                                    lines.push(`          int fx = ${fx}; int fy = ${fy}; int fw = ${fw}; int fh = ${fh}; int fr = ${fr};`); // Use interpolated JS values
+                                    lines.push(`          if (fw > 0 && fh > 0) {`);
+                                    lines.push(`            for (int dy = 0; dy < fh; dy++) {`);
+                                    lines.push(`              for (int dx = 0; dx < fw; dx++) {`);
+                                    lines.push(`                if ((fx + dx + fy + dy) % 2 != 0) continue;`); // Global dithering alignment
+                                    lines.push(`                bool inside = false;`);
+                                    lines.push(`                if ((dx >= fr && dx < fw - fr) || (dy >= fr && dy < fh - fr)) {`);
+                                    lines.push(`                  inside = true;`);
+                                    lines.push(`                } else {`);
+                                    lines.push(`                  int cx = (dx < fr) ? fr : fw - fr;`);
+                                    lines.push(`                  int cy = (dy < fr) ? fr : fh - fr;`);
+                                    lines.push(`                  if ((dx - cx)*(dx - cx) + (dy - cy)*(dy - cy) < fr*fr) inside = true;`);
+                                    lines.push(`                }`);
+                                    lines.push(`                if (inside) it.draw_pixel_at(fx + dx, fy + dy, COLOR_ON);`);
+                                    lines.push(`              }`);
+                                    lines.push(`            }`);
+                                    lines.push(`          }`);
+                                } else {
+                                    // Solid Color Fill
+                                    lines.push(`          // Fill Inner`);
+                                    if (showBorder) {
+                                        // Use interpolated values
+                                        lines.push(`          if (${fw} > 0 && ${fh} > 0) draw_rrect(${fx}, ${fy}, ${fw}, ${fh}, ${fr}, ${color});`);
+                                    } else {
+                                        // No border, just draw full
+                                        lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, ${color});`);
+                                    }
+                                }
                             } else {
-                                lines.push(`        for (int i=0; i<${borderWidth}; i++) {`);
-                                lines.push(`          it.rectangle(${w.x}+i, ${rectY}+i, ${w.width}-2*i, ${w.height}-2*i, ${color});`);
-                                lines.push(`        }`);
+                                // Outline Mode
+                                lines.push(`          // Draw Outer`);
+                                lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, ${color});`);
+                                lines.push(`          // Erase center to create outline`);
+                                lines.push(`          int t = ${thickness};`);
+                                lines.push(`          int ir = r - t; if (ir < 0) ir = 0;`);
+                                lines.push(`          draw_rrect(${w.x} + t, ${w.y} + t, w - 2*t, h - 2*t, ir, COLOR_OFF);`);
                             }
-                        }
-                    } else if (t === "shape_circle") {
-                        const r = Math.min(w.width, w.height) / 2;
-                        const cx = w.x + w.width / 2;
-                        const cy = w.y + w.height / 2;
-                        const fill = !!p.fill;
-                        const borderWidth = parseInt(p.border_width || 1, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const opacity = parseInt(p.opacity || 100, 10);
-                        const isGray = colorProp.toLowerCase() === "gray";
-                        lines.push(`        // widget:shape_circle id:${w.id} type:shape_circle x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
-                        if (fill) {
-                            if (isGray) {
-                                // Gray: use 50% checkerboard dithering pattern for circle
-                                lines.push(`        // Gray circle fill using 50% checkerboard dithering pattern`);
-                                lines.push(`        for (int dy = -${Math.floor(r)}; dy <= ${Math.floor(r)}; dy++) {`);
-                                lines.push(`          for (int dx = -${Math.floor(r)}; dx <= ${Math.floor(r)}; dx++) {`);
-                                lines.push(`            if (dx*dx + dy*dy <= ${Math.floor(r)}*${Math.floor(r)}) {`);
-                                lines.push(`              if ((dx + dy) % 2 == 0) {`);
-                                lines.push(`                it.draw_pixel_at(${Math.floor(cx)}+dx, ${Math.floor(cy)}+dy, COLOR_ON);`);
-                                lines.push(`              }`);
-                                lines.push(`            }`);
-                                lines.push(`          }`);
-                                lines.push(`        }`);
+
+                            lines.push(`        }`);
+
+                        } else if (t === "shape_rect") {
+                            const fill = !!p.fill;
+                            const borderWidth = parseInt(p.border_width || 1, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const opacity = parseInt(p.opacity || 100, 10);
+                            const isGray = colorProp.toLowerCase() === "gray";
+                            const rectY = w.y + RECT_Y_OFFSET;
+                            lines.push(`        // widget:shape_rect id:${w.id} type:shape_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
+                            if (fill) {
+                                if (isGray) {
+                                    // Gray: use 50% checkerboard dithering pattern
+                                    lines.push(`        // Gray fill using 50% checkerboard dithering pattern`);
+                                    lines.push(`        for (int dy = 0; dy < ${w.height}; dy++) {`);
+                                    lines.push(`          for (int dx = 0; dx < ${w.width}; dx++) {`);
+                                    lines.push(`            if ((dx + dy) % 2 == 0) {`);
+                                    lines.push(`              it.draw_pixel_at(${w.x}+dx, ${rectY}+dy, COLOR_ON);`);
+                                    lines.push(`            }`);
+                                    lines.push(`          }`);
+                                    lines.push(`        }`);
+                                } else {
+                                    lines.push(`        it.filled_rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
+                                }
                             } else {
-                                lines.push(`        it.filled_circle(${cx}, ${cy}, ${r}, ${color});`);
+                                if (borderWidth <= 1) {
+                                    lines.push(`        it.rectangle(${w.x}, ${rectY}, ${w.width}, ${w.height}, ${color});`);
+                                } else {
+                                    lines.push(`        for (int i=0; i<${borderWidth}; i++) {`);
+                                    lines.push(`          it.rectangle(${w.x}+i, ${rectY}+i, ${w.width}-2*i, ${w.height}-2*i, ${color});`);
+                                    lines.push(`        }`);
+                                }
                             }
-                        } else {
-                            if (borderWidth <= 1) {
-                                lines.push(`        it.circle(${cx}, ${cy}, ${r}, ${color});`);
+                        } else if (t === "shape_circle") {
+                            const r = Math.min(w.width, w.height) / 2;
+                            const cx = w.x + w.width / 2;
+                            const cy = w.y + w.height / 2;
+                            const fill = !!p.fill;
+                            const borderWidth = parseInt(p.border_width || 1, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const opacity = parseInt(p.opacity || 100, 10);
+                            const isGray = colorProp.toLowerCase() === "gray";
+                            lines.push(`        // widget:shape_circle id:${w.id} type:shape_circle x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} opacity:${opacity} color:${colorProp} ${getCondProps(w)}`);
+                            if (fill) {
+                                if (isGray) {
+                                    // Gray: use 50% checkerboard dithering pattern for circle
+                                    lines.push(`        // Gray circle fill using 50% checkerboard dithering pattern`);
+                                    lines.push(`        for (int dy = -${Math.floor(r)}; dy <= ${Math.floor(r)}; dy++) {`);
+                                    lines.push(`          for (int dx = -${Math.floor(r)}; dx <= ${Math.floor(r)}; dx++) {`);
+                                    lines.push(`            if (dx*dx + dy*dy <= ${Math.floor(r)}*${Math.floor(r)}) {`);
+                                    lines.push(`              if ((dx + dy) % 2 == 0) {`);
+                                    lines.push(`                it.draw_pixel_at(${Math.floor(cx)}+dx, ${Math.floor(cy)}+dy, COLOR_ON);`);
+                                    lines.push(`              }`);
+                                    lines.push(`            }`);
+                                    lines.push(`          }`);
+                                    lines.push(`        }`);
+                                } else {
+                                    lines.push(`        it.filled_circle(${cx}, ${cy}, ${r}, ${color});`);
+                                }
                             } else {
-                                lines.push(`        for (int i=0; i<${borderWidth}; i++) {`);
-                                lines.push(`          it.circle(${cx}, ${cy}, ${r}-i, ${color});`);
-                                lines.push(`        }`);
+                                if (borderWidth <= 1) {
+                                    lines.push(`        it.circle(${cx}, ${cy}, ${r}, ${color});`);
+                                } else {
+                                    lines.push(`        for (int i=0; i<${borderWidth}; i++) {`);
+                                    lines.push(`          it.circle(${cx}, ${cy}, ${r}-i, ${color});`);
+                                    lines.push(`        }`);
+                                }
                             }
-                        }
-                    } else if (t === "datetime") {
-                        const format = p.format || "time_date";
-                        const timeSize = parseInt(p.time_font_size || 28, 10);
-                        const dateSize = parseInt(p.date_font_size || 16, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const fontFamily = p.font_family || "Roboto";
-                        const italic = p.italic ? "true" : "false";
-                        const italicSuffix = p.italic ? "_italic" : "";
-                        const timeFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_700_${timeSize}${italicSuffix}`;
-                        const dateFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_400_${dateSize}${italicSuffix}`;
-                        usedFontIds.add(timeFontId);
-                        usedFontIds.add(dateFontId);
-                        lines.push(`        // widget:datetime id:${w.id} type:datetime x:${w.x} y:${w.y} w:${w.width} h:${w.height} format:${format} time_font:${timeSize} date_font:${dateSize} color:${colorProp} font_family:"${fontFamily}" italic:${italic} ${getCondProps(w)}`);
-                        lines.push(`        auto now = id(ha_time).now();`);
-                        const cx = w.x + Math.floor(w.width / 2);
-                        if (format === "time_only") {
-                            lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
-                        } else if (format === "date_only") {
-                            lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
-                        } else {
-                            lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
-                            lines.push(`        it.strftime(${cx}, ${w.y} + ${timeSize} + 4 + ${TEXT_Y_OFFSET}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
-                        }
-                    } else if (t === "image") {
-                        const path = (p.path || "").trim();
-                        const invert = !!p.invert;
-                        const renderMode = p.render_mode || "Auto";
-                        lines.push(`        // widget:image id:${w.id} type:image x:${w.x} y:${w.y} w:${w.width} h:${w.height} path:"${path}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
-                        if (path) {
-                            // Generate same ID format as in the image: section
-                            const safePath = path.replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "").replace(/_+/g, "_");
-                            const safeId = `img_${safePath}_${w.width}x${w.height}`;
+                        } else if (t === "datetime") {
+                            const format = p.format || "time_date";
+                            const timeSize = parseInt(p.time_font_size || 28, 10);
+                            const dateSize = parseInt(p.date_font_size || 16, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const fontFamily = p.font_family || "Roboto";
+                            const italic = p.italic ? "true" : "false";
+                            const italicSuffix = p.italic ? "_italic" : "";
+                            const timeFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_700_${timeSize}${italicSuffix}`;
+                            const dateFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_400_${dateSize}${italicSuffix}`;
+                            usedFontIds.add(timeFontId);
+                            usedFontIds.add(dateFontId);
+                            lines.push(`        // widget:datetime id:${w.id} type:datetime x:${w.x} y:${w.y} w:${w.width} h:${w.height} format:${format} time_font:${timeSize} date_font:${dateSize} color:${colorProp} font_family:"${fontFamily}" italic:${italic} ${getCondProps(w)}`);
+                            lines.push(`        auto now = id(ha_time).now();`);
+                            const cx = w.x + Math.floor(w.width / 2);
+                            if (format === "time_only") {
+                                lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
+                            } else if (format === "date_only") {
+                                lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
+                            } else if (format === "weekday_day_month") {
+                                lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%A %d %B", now);`);
+                            } else {
+                                lines.push(`        it.strftime(${cx}, ${w.y} + ${TEXT_Y_OFFSET}, id(${timeFontId}), ${color}, TextAlign::TOP_CENTER, "%H:%M", now);`);
+                                lines.push(`        it.strftime(${cx}, ${w.y} + ${timeSize} + 4 + ${TEXT_Y_OFFSET}, id(${dateFontId}), ${color}, TextAlign::TOP_CENTER, "%a, %b %d", now);`);
+                            }
+                        } else if (t === "image") {
+                            const path = (p.path || "").trim();
+                            const invert = !!p.invert;
+                            const renderMode = p.render_mode || "Auto";
+                            lines.push(`        // widget:image id:${w.id} type:image x:${w.x} y:${w.y} w:${w.width} h:${w.height} path:"${path}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
+                            if (path) {
+                                // Generate same ID format as in the image: section
+                                const safePath = path.replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "").replace(/_+/g, "_");
+                                const safeId = `img_${safePath}_${w.width}x${w.height}`;
+                                if (invert) {
+                                    lines.push(`        it.image(${w.x}, ${w.y}, id(${safeId}), COLOR_OFF, COLOR_ON);`);
+                                } else {
+                                    lines.push(`        it.image(${w.x}, ${w.y}, id(${safeId}));`);
+                                }
+                            }
+                        } else if (t === "online_image") {
+                            const url = p.url || "";
+                            const invert = !!p.invert;
+                            const renderMode = p.render_mode || "Auto";
+                            // Sanitize widget ID to match the online_image: component declaration
+                            const onlineImageId = `online_image_${w.id}`.replace(/-/g, "_");
+                            lines.push(`        // widget:online_image id:${w.id} type:online_image x:${w.x} y:${w.y} w:${w.width} h:${w.height} url:"${url}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
                             if (invert) {
-                                lines.push(`        it.image(${w.x}, ${w.y}, id(${safeId}), COLOR_OFF, COLOR_ON);`);
+                                lines.push(`        it.image(${w.x}, ${w.y}, id(${onlineImageId}), COLOR_OFF, COLOR_ON);`);
                             } else {
-                                lines.push(`        it.image(${w.x}, ${w.y}, id(${safeId}));`);
+                                lines.push(`        it.image(${w.x}, ${w.y}, id(${onlineImageId}));`);
                             }
-                        }
-                    } else if (t === "online_image") {
-                        const url = p.url || "";
-                        const invert = !!p.invert;
-                        const renderMode = p.render_mode || "Auto";
-                        // Sanitize widget ID to match the online_image: component declaration
-                        const onlineImageId = `online_image_${w.id}`.replace(/-/g, "_");
-                        lines.push(`        // widget:online_image id:${w.id} type:online_image x:${w.x} y:${w.y} w:${w.width} h:${w.height} url:"${url}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
-                        if (invert) {
-                            lines.push(`        it.image(${w.x}, ${w.y}, id(${onlineImageId}), COLOR_OFF, COLOR_ON);`);
-                        } else {
-                            lines.push(`        it.image(${w.x}, ${w.y}, id(${onlineImageId}));`);
-                        }
-                    } else if (t === "puppet") {
-                        const url = p.image_url || "";
-                        const invert = !!p.invert;
-                        const renderMode = p.render_mode || "Auto";
-                        lines.push(`        // widget:puppet id:${w.id} type:puppet x:${w.x} y:${w.y} w:${w.width} h:${w.height} url:"${url}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
-                        const puppetId = `puppet_${w.id}`.replace(/-/g, "_");
-                        if (invert) {
-                            lines.push(`        it.image(${w.x}, ${w.y}, id(${puppetId}), COLOR_OFF, COLOR_ON);`);
-                        } else {
-                            lines.push(`        it.image(${w.x}, ${w.y}, id(${puppetId}));`);
-                        }
-                    } else if (t === "quote_rss") {
-                        // Quote/RSS widget - displays a quote from an RSS feed
-                        const feedUrl = (p.feed_url || "https://www.brainyquote.com/link/quotebr.rss").replace(/"/g, '\\"');
-                        const showAuthor = p.show_author !== false;
-                        const quoteFontSize = parseInt(p.quote_font_size || 18, 10);
-                        const authorFontSize = parseInt(p.author_font_size || 14, 10);
-                        const fontFamily = p.font_family || "Roboto";
-                        const fontWeight = parseInt(p.font_weight || 400, 10);
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const textAlign = p.text_align || "TOP_LEFT";
-                        const italicQuote = p.italic_quote !== false;
-                        const refreshInterval = p.refresh_interval || "1h";
-                        const randomQuote = p.random !== false;
-                        const wordWrap = p.word_wrap !== false;
+                        } else if (t === "puppet") {
+                            const url = p.image_url || "";
+                            const invert = !!p.invert;
+                            const renderMode = p.render_mode || "Auto";
+                            lines.push(`        // widget:puppet id:${w.id} type:puppet x:${w.x} y:${w.y} w:${w.width} h:${w.height} url:"${url}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
+                            const puppetId = `puppet_${w.id}`.replace(/-/g, "_");
+                            if (invert) {
+                                lines.push(`        it.image(${w.x}, ${w.y}, id(${puppetId}), COLOR_OFF, COLOR_ON);`);
+                            } else {
+                                lines.push(`        it.image(${w.x}, ${w.y}, id(${puppetId}));`);
+                            }
+                        } else if (t === "quote_rss") {
+                            // Quote/RSS widget - displays a quote from an RSS feed
+                            const feedUrl = (p.feed_url || "https://www.brainyquote.com/link/quotebr.rss").replace(/"/g, '\\"');
+                            const showAuthor = p.show_author !== false;
+                            const quoteFontSize = parseInt(p.quote_font_size || 18, 10);
+                            const authorFontSize = parseInt(p.author_font_size || 14, 10);
+                            const fontFamily = p.font_family || "Roboto";
+                            const fontWeight = parseInt(p.font_weight || 400, 10);
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const textAlign = p.text_align || "TOP_LEFT";
+                            const italicQuote = p.italic_quote !== false;
+                            const refreshInterval = p.refresh_interval || "1h";
+                            const randomQuote = p.random !== false;
+                            const wordWrap = p.word_wrap !== false;
 
-                        // Generate unique IDs for this widget's sensors
-                        const quoteTextId = `quote_text_${w.id}`.replace(/-/g, "_");
-                        const quoteAuthorId = `quote_author_${w.id}`.replace(/-/g, "_");
+                            // Generate unique IDs for this widget's sensors
+                            const quoteTextId = `quote_text_${w.id}`.replace(/-/g, "_");
+                            const quoteAuthorId = `quote_author_${w.id}`.replace(/-/g, "_");
 
-                        // Add fonts - quote font may be italic, author font is not
-                        const quoteItalicSuffix = italicQuote ? "_italic" : "";
-                        const quoteFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${quoteFontSize}${quoteItalicSuffix}`;
-                        const authorFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${authorFontSize}`;
-                        addFont(fontFamily, fontWeight, quoteFontSize, italicQuote);
-                        addFont(fontFamily, fontWeight, authorFontSize, false);
-                        usedFontIds.add(quoteFontId);
-                        if (showAuthor) usedFontIds.add(authorFontId);
+                            // Add fonts - quote font may be italic, author font is not
+                            const quoteItalicSuffix = italicQuote ? "_italic" : "";
+                            const quoteFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${quoteFontSize}${quoteItalicSuffix}`;
+                            const authorFontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${authorFontSize}`;
+                            addFont(fontFamily, fontWeight, quoteFontSize, italicQuote);
+                            addFont(fontFamily, fontWeight, authorFontSize, false);
+                            usedFontIds.add(quoteFontId);
+                            if (showAuthor) usedFontIds.add(authorFontId);
 
-                        lines.push(`        // widget:quote_rss id:${w.id} type:quote_rss x:${w.x} y:${w.y} w:${w.width} h:${w.height} feed_url:"${feedUrl}" show_author:${showAuthor} quote_font:${quoteFontSize} author_font:${authorFontSize} color:${colorProp} align:${textAlign} italic:${italicQuote} refresh:${refreshInterval} random:${randomQuote} wrap:${wordWrap} ${getCondProps(w)}`);
+                            lines.push(`        // widget:quote_rss id:${w.id} type:quote_rss x:${w.x} y:${w.y} w:${w.width} h:${w.height} feed_url:"${feedUrl}" show_author:${showAuthor} quote_font:${quoteFontSize} author_font:${authorFontSize} color:${colorProp} align:${textAlign} italic:${italicQuote} refresh:${refreshInterval} random:${randomQuote} wrap:${wordWrap} ${getCondProps(w)}`);
 
-                        // Calculate alignment X position
-                        const alignX = getAlignX(textAlign, w.x, w.width);
-                        const esphomeAlign = `TextAlign::${textAlign}`;
+                            // Calculate alignment X position
+                            const alignX = getAlignX(textAlign, w.x, w.width);
+                            const esphomeAlign = `TextAlign::${textAlign}`;
 
-                        // Generate the display code with word wrapping support
-                        lines.push(`        {`);
-                        lines.push(`          std::string quote_text = id(${quoteTextId}_global);`);
-                        if (showAuthor) {
-                            lines.push(`          std::string quote_author = id(${quoteAuthorId}_global);`);
-                        }
-
-
-                        if (wordWrap) {
-                            // Word wrap implementation
-                            lines.push(`          // Word wrap the quote text`);
-                            lines.push(`          int max_width = ${w.width - 16};  // Leave padding`);
-                            lines.push(`          int line_height = ${quoteFontSize + 4};`);
-                            lines.push(`          int y_pos = ${w.y + 8};`);
-                            lines.push(`          std::string current_line = "";`);
-                            lines.push(`          std::string word = "";`);
-                            lines.push(`          `);
-                            lines.push(`          // Add opening quote mark`);
-                            lines.push(`          quote_text = "\\"" + quote_text + "\\"";`);
-                            lines.push(`          `);
-                            lines.push(`          for (size_t i = 0; i <= quote_text.length(); i++) {`);
-                            lines.push(`            char c = (i < quote_text.length()) ? quote_text[i] : ' ';`);
-                            lines.push(`            if (c == ' ' || c == '\\0' || i == quote_text.length()) {`);
-                            lines.push(`              if (!word.empty()) {`);
-                            lines.push(`                std::string test_line = current_line.empty() ? word : current_line + " " + word;`);
-                            lines.push(`                int test_width = 0, test_height = 0, x_offset = 0;`);
-                            lines.push(`                id(${quoteFontId}).measure(test_line.c_str(), &test_width, &x_offset, &test_height, &test_height);`);
-                            lines.push(`                if (test_width > max_width && !current_line.empty()) {`);
-                            lines.push(`                  it.printf(${alignX}, y_pos, id(${quoteFontId}), ${color}, ${esphomeAlign}, "%s", current_line.c_str());`);
-                            lines.push(`                  y_pos += line_height;`);
-                            lines.push(`                  current_line = word;`);
-                            lines.push(`                } else {`);
-                            lines.push(`                  current_line = test_line;`);
-                            lines.push(`                }`);
-                            lines.push(`                word = "";`);
-                            lines.push(`              }`);
-                            lines.push(`            } else {`);
-                            lines.push(`              word += c;`);
-                            lines.push(`            }`);
-                            lines.push(`          }`);
-                            lines.push(`          if (!current_line.empty()) {`);
-                            lines.push(`            it.printf(${alignX}, y_pos, id(${quoteFontId}), ${color}, ${esphomeAlign}, "%s", current_line.c_str());`);
-                            lines.push(`            y_pos += line_height;`);
-                            lines.push(`          }`);
-
+                            // Generate the display code with word wrapping support
+                            lines.push(`        {`);
+                            lines.push(`          std::string quote_text = id(${quoteTextId}_global);`);
                             if (showAuthor) {
-                                lines.push(`          // Draw author`);
-                                lines.push(`          if (!quote_author.empty()) {`);
-                                lines.push(`            y_pos += 4;  // Extra spacing before author`);
-                                lines.push(`            it.printf(${alignX}, y_pos, id(${authorFontId}), ${color}, ${esphomeAlign}, "— %s", quote_author.c_str());`);
-                                lines.push(`          }`);
+                                lines.push(`          std::string quote_author = id(${quoteAuthorId}_global);`);
                             }
-                        } else {
-                            // Simple mode without word wrap (single line quote)
-                            lines.push(`          it.printf(${alignX}, ${w.y + 8}, id(${quoteFontId}), ${color}, ${esphomeAlign}, "\\"%s\\"", quote_text.c_str());`);
-                            if (showAuthor) {
-                                lines.push(`          if (!quote_author.empty()) {`);
-                                lines.push(`            it.printf(${alignX}, ${w.y + 8 + quoteFontSize + 4}, id(${authorFontId}), ${color}, ${esphomeAlign}, "— %s", quote_author.c_str());`);
+
+
+                            if (wordWrap) {
+                                // Word wrap implementation
+                                lines.push(`          // Word wrap the quote text`);
+                                lines.push(`          int max_width = ${w.width - 16};  // Leave padding`);
+                                lines.push(`          int line_height = ${quoteFontSize + 4};`);
+                                lines.push(`          int y_pos = ${w.y + 8};`);
+                                lines.push(`          std::string current_line = "";`);
+                                lines.push(`          std::string word = "";`);
+                                lines.push(`          `);
+                                lines.push(`          // Add opening quote mark`);
+                                lines.push(`          quote_text = "\\"" + quote_text + "\\"";`);
+                                lines.push(`          `);
+                                lines.push(`          for (size_t i = 0; i <= quote_text.length(); i++) {`);
+                                lines.push(`            char c = (i < quote_text.length()) ? quote_text[i] : ' ';`);
+                                lines.push(`            if (c == ' ' || c == '\\0' || i == quote_text.length()) {`);
+                                lines.push(`              if (!word.empty()) {`);
+                                lines.push(`                std::string test_line = current_line.empty() ? word : current_line + " " + word;`);
+                                lines.push(`                int test_width = 0, test_height = 0, x_offset = 0;`);
+                                lines.push(`                id(${quoteFontId}).measure(test_line.c_str(), &test_width, &x_offset, &test_height, &test_height);`);
+                                lines.push(`                if (test_width > max_width && !current_line.empty()) {`);
+                                lines.push(`                  it.printf(${alignX}, y_pos, id(${quoteFontId}), ${color}, ${esphomeAlign}, "%s", current_line.c_str());`);
+                                lines.push(`                  y_pos += line_height;`);
+                                lines.push(`                  current_line = word;`);
+                                lines.push(`                } else {`);
+                                lines.push(`                  current_line = test_line;`);
+                                lines.push(`                }`);
+                                lines.push(`                word = "";`);
+                                lines.push(`              }`);
+                                lines.push(`            } else {`);
+                                lines.push(`              word += c;`);
+                                lines.push(`            }`);
                                 lines.push(`          }`);
+                                lines.push(`          if (!current_line.empty()) {`);
+                                lines.push(`            it.printf(${alignX}, y_pos, id(${quoteFontId}), ${color}, ${esphomeAlign}, "%s", current_line.c_str());`);
+                                lines.push(`            y_pos += line_height;`);
+                                lines.push(`          }`);
+
+                                if (showAuthor) {
+                                    lines.push(`          // Draw author`);
+                                    lines.push(`          if (!quote_author.empty()) {`);
+                                    lines.push(`            y_pos += 4;  // Extra spacing before author`);
+                                    lines.push(`            it.printf(${alignX}, y_pos, id(${authorFontId}), ${color}, ${esphomeAlign}, "— %s", quote_author.c_str());`);
+                                    lines.push(`          }`);
+                                }
+                            } else {
+                                // Simple mode without word wrap (single line quote)
+                                lines.push(`          it.printf(${alignX}, ${w.y + 8}, id(${quoteFontId}), ${color}, ${esphomeAlign}, "\\"%s\\"", quote_text.c_str());`);
+                                if (showAuthor) {
+                                    lines.push(`          if (!quote_author.empty()) {`);
+                                    lines.push(`            it.printf(${alignX}, ${w.y + 8 + quoteFontSize + 4}, id(${authorFontId}), ${color}, ${esphomeAlign}, "— %s", quote_author.c_str());`);
+                                    lines.push(`          }`);
+                                }
                             }
+
+                            lines.push(`        }`);
+                        } else if (t === "line") {
+                            const colorProp = p.color || "black";
+                            const color = getColorConst(colorProp);
+                            const strokeWidth = parseInt(p.stroke_width || 3, 10) || 3;
+                            const orientation = p.orientation || "horizontal";
+
+                            // Use filled_rectangle for lines - simpler and supports thickness
+                            // For horizontal: width is w.width (line length), height is strokeWidth
+                            // For vertical: width is strokeWidth, height is w.height (line length)
+
+                            let rectW, rectH;
+
+                            if (orientation === "vertical") {
+                                rectW = strokeWidth;
+                                rectH = w.height;
+                            } else {
+                                rectW = w.width;
+                                rectH = strokeWidth;
+                            }
+
+                            lines.push(`        // widget:line id:${w.id} type:line x:${w.x} y:${w.y} w:${rectW} h:${rectH} stroke:${strokeWidth} color:${colorProp} orientation:${orientation} ${getCondProps(w)}`);
+                            lines.push(`        it.filled_rectangle(${w.x}, ${w.y}, ${rectW}, ${rectH}, ${color});`);
                         }
-
-                        lines.push(`        }`);
-                    } else if (t === "line") {
-                        const colorProp = p.color || "black";
-                        const color = getColorConst(colorProp);
-                        const strokeWidth = parseInt(p.stroke_width || 3, 10) || 3;
-                        const orientation = p.orientation || "horizontal";
-
-                        // Use filled_rectangle for lines - simpler and supports thickness
-                        // For horizontal: width is w.width (line length), height is strokeWidth
-                        // For vertical: width is strokeWidth, height is w.height (line length)
-
-                        let rectW, rectH;
-
-                        if (orientation === "vertical") {
-                            rectW = strokeWidth;
-                            rectH = w.height;
-                        } else {
-                            rectW = w.width;
-                            rectH = strokeWidth;
-                        }
-
-                        lines.push(`        // widget:line id:${w.id} type:line x:${w.x} y:${w.y} w:${rectW} h:${rectH} stroke:${strokeWidth} color:${colorProp} orientation:${orientation} ${getCondProps(w)}`);
-                        lines.push(`        it.filled_rectangle(${w.x}, ${w.y}, ${rectW}, ${rectH}, ${color});`);
-                    }
-                });
+                    });
+                }
             }
+            lines.push("      }");
+        });
+    } // End if (!useLVGL)
+
+    if (useLVGL) {
+        if (window.generateLVGLSnippet) {
+            lines.push(...window.generateLVGLSnippet(pagesLocal, deviceModel));
         }
-        lines.push("      }");
-    });
+    }
 
     // === Font Validation ===
     // Check for fonts used in lambda but not defined in font: section
