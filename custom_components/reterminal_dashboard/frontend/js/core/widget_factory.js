@@ -319,6 +319,23 @@ class WidgetFactory {
                     border_width: 2
                 };
                 break;
+            case "calendar":
+                // Standard size for a calendar widget
+                widget.width = 400;
+                widget.height = 350;
+                widget.props = {
+                    entity_id: "sensor.esp_calendar_data",
+                    border_width: 2,
+                    show_border: true,
+                    border_color: "black",
+                    background_color: "white",
+                    text_color: "black",
+                    font_size_date: 100,
+                    font_size_day: 24,
+                    font_size_grid: 14,
+                    font_size_event: 18
+                };
+                break;
         }
 
         return widget;

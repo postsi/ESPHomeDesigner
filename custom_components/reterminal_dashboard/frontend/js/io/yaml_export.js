@@ -646,6 +646,14 @@ function generateSnippetLocally() {
 
                 addFont(family, 700, daySize, false); // Day name (bold)
                 addFont(family, 400, tempSize, false); // Temp (regular)
+            } else if (t === "calendar") {
+                // Calendar needs specific fonts
+                const family = p.font_family || "Roboto";
+                addFont(family, 100, p.font_size_date || 100, false); // Large date number (thin)
+                addFont(family, 700, p.font_size_day || 24, false); // Day name
+                addFont(family, 400, p.font_size_grid || 14, false); // Date/Month/Year and grid text
+                addFont(family, 400, p.font_size_event || 18, false); // Event summary
+                addFont(family, 400, 24, false); // Event day number (usually larger than summary)
             }
         }
     }
@@ -973,7 +981,9 @@ function generateSnippetLocally() {
 
             // Only add resize for non-BINARY types (User request: simpler memory usage)
             if (imgType !== "BINARY") {
-                lines.push(`    resize: ${w.width}x${w.height}`);
+                const rW = parseInt(w.width, 10);
+                const rH = parseInt(w.height, 10);
+                lines.push(`    resize: ${rW}x${rH}`);
             }
 
             lines.push(`    update_interval: ${updateInterval}`);
@@ -1001,8 +1011,8 @@ function generateSnippetLocally() {
             const p = w.props || {};
             const safeId = `graph_${w.id}`.replace(/-/g, "_");
             const duration = p.duration || "1h";
-            const width = w.width;
-            const height = w.height;
+            const width = parseInt(w.width, 10);
+            const height = parseInt(w.height, 10);
             const maxRange = p.max_range ? parseFloat(p.max_range) : null;
             const minRange = p.min_range ? parseFloat(p.min_range) : null;
 
@@ -1332,6 +1342,18 @@ function generateSnippetLocally() {
         }
     }
 
+    // Collect calendar widgets
+    const calendarWidgets = [];
+    for (const page of pagesLocal) {
+        if (!page || !Array.isArray(page.widgets)) continue;
+        for (const w of page.widgets) {
+            const t = (w.type || "").toLowerCase();
+            if (t === "calendar") {
+                calendarWidgets.push(w);
+            }
+        }
+    }
+
     // Collect weather entities used by sensor_text and weather_icon widgets
     const weatherEntitiesUsed = new Set();
     // Collect text_sensor entities used by sensor_text widgets
@@ -1353,7 +1375,7 @@ function generateSnippetLocally() {
     }
 
     // Check if we need text_sensor block
-    const needsTextSensors = quoteRssWidgets.length > 0 || weatherForecastWidgets.length > 0 || weatherEntitiesUsed.size > 0 || textSensorEntitiesUsed.size > 0;
+    const needsTextSensors = quoteRssWidgets.length > 0 || weatherForecastWidgets.length > 0 || weatherEntitiesUsed.size > 0 || textSensorEntitiesUsed.size > 0 || calendarWidgets.length > 0;
 
     if (needsTextSensors) {
         lines.push("text_sensor:");
@@ -1420,12 +1442,48 @@ function generateSnippetLocally() {
                 lines.push(`    internal: true`);
             }
         }
+
+        // Add calendar text sensors
+        if (calendarWidgets.length > 0) {
+            lines.push("  # Calendar Widget Sensors (from Home Assistant)");
+            for (const w of calendarWidgets) {
+                const entityId = (w.props && w.props.entity_id) || "sensor.esp_calendar_data";
+                lines.push(`  - platform: homeassistant`);
+                lines.push(`    id: calendar_json_${w.id}`);
+                lines.push(`    entity_id: ${entityId}`);
+                lines.push(`    attribute: entries`);
+                lines.push(`    internal: true`);
+                lines.push(`  - platform: homeassistant`);
+                lines.push(`    id: todays_day_name_${w.id}`);
+                lines.push(`    entity_id: ${entityId}`);
+                lines.push(`    attribute: todays_day_name`);
+                lines.push(`    internal: true`);
+                lines.push(`  - platform: homeassistant`);
+                lines.push(`    id: todays_date_month_year_${w.id}`);
+                lines.push(`    entity_id: ${entityId}`);
+                lines.push(`    attribute: todays_date_month_year`);
+                lines.push(`    internal: true`);
+            }
+        }
         lines.push("");
     }
 
     // ========================================================================
     // HOME ASSISTANT TEMPLATE SENSORS (Instructions only)
     // ========================================================================
+
+    if (calendarWidgets.length > 0) {
+        lines.push("# ============================================================================");
+        lines.push("# CALENDAR WIDGET SETUP");
+        lines.push("# Requires 'esp_calendar_data_conversion.py' in HA python_scripts/");
+        lines.push("# (You can download this script from the Calendar Widget properties panel in the designer)");
+        lines.push("# and a corresponding template sensor configuration.");
+        lines.push("# See documentation/walkthrough for details.");
+        lines.push("#");
+        lines.push("# Based on the work by paviro: https://github.com/paviro/ESPHome-ePaper-Calendar");
+        lines.push("# ============================================================================");
+        lines.push("");
+    }
 
     if (weatherForecastWidgets.length > 0) {
         lines.push("# ============================================================================");
@@ -1536,6 +1594,42 @@ function generateSnippetLocally() {
         }
         lines.push("      it.fill(COLOR_OFF);");
         lines.push("");
+
+        // Inject Calendar Helpers if needed (once)
+        if (calendarWidgets.length > 0) {
+            lines.push("      // --- Calendar Helpers ---");
+            lines.push("      auto is_leap_year = [](int year) -> int {");
+            lines.push("          return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);");
+            lines.push("      };");
+            lines.push("");
+            lines.push("      auto get_calendar_matrix = [&](int year, int month, char cal[7][7][3]) {");
+            lines.push("          int days_in_month[] = {31, 28 + is_leap_year(year), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};");
+            lines.push("          int num_days = days_in_month[month - 1];");
+            lines.push("          if (month < 3) { month = month + 12; year = year - 1; }");
+            lines.push("          int day_of_week = (1 + (13 * (month + 1)) / 5 + year + year / 4 - year / 100 + year / 400) % 7;");
+            lines.push("          day_of_week = (day_of_week + 5) % 7; // Adjust for Monday start");
+            lines.push("          const char *weekdays[] = {\"Mo\", \"Tu\", \"We\", \"Th\", \"Fr\", \"Sa\", \"Su\"};");
+            lines.push("          for (int i = 0; i < 7; i++) strcpy(cal[0][i], weekdays[i]);");
+            lines.push("          int current_day = 1 - day_of_week;");
+            lines.push("          for (int week_num = 1; week_num < 7; week_num++) {");
+            lines.push("              for (int day_num = 0; day_num < 7; day_num++) {");
+            lines.push("                  if (current_day > 0 && current_day <= num_days) sprintf(cal[week_num][day_num], \"%d\", current_day);");
+            lines.push("                  else strcpy(cal[week_num][day_num], \"\");");
+            lines.push("                  current_day++;");
+            lines.push("              }");
+            lines.push("          }");
+            lines.push("      };");
+            lines.push("");
+            lines.push("      auto extract_time = [](const char* datetime) -> std::string {");
+            lines.push("          std::string datetimeStr(datetime);");
+            lines.push("          size_t pos = datetimeStr.find('T');");
+            lines.push("          if (pos != std::string::npos && pos + 3 < datetimeStr.size()) return datetimeStr.substr(pos + 1, 5);");
+            lines.push("          return \"\";");
+            lines.push("      };");
+            lines.push("      // --- End Calendar Helpers ---");
+            lines.push("");
+        }
+
         lines.push("      int page = id(display_page);");
 
         pages.forEach((page, pageIndex) => {
@@ -1580,6 +1674,8 @@ function generateSnippetLocally() {
                         // Parse coordinates as integers to ensure math operations work correctly (preventing string concatenation)
                         w.x = parseInt(w.x, 10);
                         w.y = parseInt(w.y, 10);
+                        w.width = parseInt(w.width, 10);
+                        w.height = parseInt(w.height, 10);
 
                         // Add local sensor marker comment for relevant widgets
                         let localMarker = "";
@@ -2048,7 +2144,7 @@ function generateSnippetLocally() {
                             const pctFontRef = `font_roboto_400_${fontSize}`;
                             usedFontIds.add(pctFontRef);
 
-                            const sensorId = (p.is_local_sensor || !entityId) ? "battery_level" : entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
+                            const sensorId = (p.is_local_sensor) ? "battery_level" : (entityId ? entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") : "battery_level");
 
                             lines.push(`        // widget:battery_icon id:${w.id} type:battery_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "battery_level"} size:${size} font_size:${fontSize} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
                             lines.push(`        {`);
@@ -2105,6 +2201,135 @@ function generateSnippetLocally() {
                             } else {
                                 lines.push(`        it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000F0595");`);
                             }
+                        } else if (t === "calendar") {
+                            const entityId = (p.entity_id || "sensor.esp_calendar_data").trim();
+                            const borderWidth = parseInt(p.border_width || 2, 10);
+                            const showBorder = p.show_border !== false;
+                            const colorProp = p.text_color || "black";
+                            const borderColorProp = p.border_color || "black";
+                            const bgColorProp = p.background_color || "white";
+
+                            const color = getColorConst(colorProp); // Text Color
+                            const borderColor = getColorConst(borderColorProp); // Border Color
+                            const bgColor = getColorConst(bgColorProp); // Background Color
+
+
+                            // Dynamic Font IDs based on properties
+                            // Helper to get ID similar to addFont logic
+                            const getFontId = (family, weight, size, italic) => {
+                                // Default family Roboto handled in addFont but here we need to match it
+                                const f = family || "Roboto";
+                                const iStr = italic ? "_italic" : "";
+                                return `font_${f.toLowerCase().replace(/ /g, "_")}_${weight}_${size}${iStr}`;
+                            };
+
+                            const fFamily = p.font_family || "Roboto";
+                            const szDate = p.font_size_date || 100;
+                            const szDay = p.font_size_day || 24;
+                            const szGrid = p.font_size_grid || 14;
+                            const szEvent = p.font_size_event || 18;
+
+                            const fontBig = getFontId(fFamily, 100, szDate, false);
+                            const fontDay = getFontId(fFamily, 700, szDay, false);
+                            const fontDate = getFontId(fFamily, 400, szGrid, false); // Reused for grid text
+                            const fontEventDay = getFontId(fFamily, 400, 24, false); // Keep event day size standard or make customizable? Original was 24.
+                            const fontEvent = getFontId(fFamily, 400, szEvent, false); // summary
+
+                            usedFontIds.add(fontBig);
+                            usedFontIds.add(fontDay);
+                            usedFontIds.add(fontDate);
+                            usedFontIds.add(fontEventDay);
+                            usedFontIds.add(fontEvent);
+
+                            lines.push(`        // widget:calendar id:${w.id} type:calendar x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} border_width:${borderWidth} show_border:${showBorder} color:"${colorProp}" font_size_date:${szDate} font_size_day:${szDay} font_size_grid:${szGrid} font_size_event:${szEvent} ${getCondProps(w)}`);
+                            lines.push(`        {`);
+                            lines.push(`          auto time = id(ha_time).now();`);
+
+                            // Background
+                            lines.push(`          it.filled_rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${bgColor});`);
+                            if (showBorder) {
+                                lines.push(`          it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${borderColor});`);
+                            }
+
+                            lines.push(`          int cx = ${w.x} + (${w.width} / 2);`);
+
+                            // Header: Date
+                            lines.push(`          it.printf(cx, ${w.y} + 10, id(${fontBig}), ${color}, TextAlign::TOP_CENTER, "%d", time.day_of_month);`);
+                            lines.push(`          it.printf(cx, ${w.y} + 110, id(${fontDay}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_day_name_${w.id}).state.c_str());`);
+                            lines.push(`          it.printf(cx, ${w.y} + 140, id(${fontDate}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_date_month_year_${w.id}).state.c_str());`);
+
+                            // Calendar Grid
+                            lines.push(`          int calendar_y_pos = ${w.y} + 180;`);
+                            lines.push(`          char cal[7][7][3];`);
+                            lines.push(`          get_calendar_matrix(time.year, time.month, cal);`);
+
+                            lines.push(`          int cell_width = (${w.width} - 40) / 7;`);
+                            lines.push(`          int cell_height = 25;`);
+                            lines.push(`          int start_x = ${w.x} + 20;`);
+
+                            lines.push(`          for (int i = 0; i < 7; i++) {`);
+                            lines.push(`              for (int j = 0; j < 7; j++) {`);
+                            lines.push(`                  int px = start_x + (j * cell_width) + (cell_width / 2);`);
+                            lines.push(`                  int py = calendar_y_pos + (i * cell_height);`);
+                            lines.push(`                  if (i == 0) {`);
+                            lines.push(`                      it.printf(px, py, id(${fontDate}), ${color}, TextAlign::TOP_CENTER, "%s", cal[i][j]);`);
+                            lines.push(`                  } else {`);
+                            lines.push(`                      if (atoi(cal[i][j]) == time.day_of_month) {`);
+                            lines.push(`                           it.filled_circle(px, py + 12, 10, ${color});`);
+                            lines.push(`                           it.printf(px, py + 5, id(${fontDate}), ${bgColor}, TextAlign::TOP_CENTER, "%s", cal[i][j]);`);
+                            lines.push(`                      } else {`);
+                            lines.push(`                           it.printf(px, py + 5, id(${fontDate}), ${color}, TextAlign::TOP_CENTER, "%s", cal[i][j]);`);
+                            lines.push(`                      }`);
+                            lines.push(`                  }`);
+                            lines.push(`              }`);
+                            lines.push(`          }`);
+                            lines.push(`          it.line(start_x, calendar_y_pos + cell_height, ${w.x} + ${w.width} - 20, calendar_y_pos + cell_height, ${color});`);
+
+                            // Events List (using ArduinoJson implicitly via ESPHome json component which should be enabled by text_sensor having json attribute, but here we parse manually)
+                            // IMPORTANT: We need `json:` in config if not present. 
+                            lines.push(`          // Events`);
+                            lines.push(`          if (id(calendar_json_${w.id}).state != "unknown" && id(calendar_json_${w.id}).state.length() > 2) {`);
+                            lines.push(`             json::parse_json(id(calendar_json_${w.id}).state, [](JsonObject root) -> bool {`);
+                            // Note: parse_json yields the root object/array. The input is an array of entries? 
+                            // The reference does: deserializeJson(doc, json_string); JsonArray entries = doc.as<JsonArray>();
+                            // In ESPHome lambda `json::parse_json`: 
+                            // json::parse_json(str, [](JsonObject root) { ... }) 
+                            // Only supports Object root. If root is Array, this might be tricky.
+                            // However, the python script returns `{"entries": [...]}` so root is Object.
+                            // The text_sensor `calendar_json_${id}` is defined as `attribute: entries`.
+                            // So the state of `calendar_json_${id}` is likely the ARRAY string `[...]`.
+                            // ESPHome `parse_json` helper only supports `JsonObject`. 
+                            // We might need to use `ExternalRAMJsonDocument` or similar if we want to manually parse an array string.
+                            // OR, we change the text_sensor to point to the base entity and we parse `entries` from it.
+                            // BUT `text_sensor` with `attribute` pulls that specific attribute value string.
+
+                            // Workaround: We will assume the python script output structure.
+                            // Actually, let's use the `json` component functionality if possible?
+                            // No, `parse_json` is the standard way.
+
+                            // If `entries` is a list `[...]`, `parse_json` might fail if it expects `{}`.
+                            // Let's rely on standard ArduinoJson `deserializeJson` locally since we are in a lambda.
+                            lines.push(`              DynamicJsonDocument doc(4096);`);
+                            lines.push(`              DeserializationError error = deserializeJson(doc, id(calendar_json_${w.id}).state.c_str());`);
+                            lines.push(`              if (!error) {`);
+                            lines.push(`                  JsonArray entries = doc.as<JsonArray>();`);
+                            lines.push(`                  int y_cursor = calendar_y_pos + (7 * cell_height) + 20;`);
+                            lines.push(`                  it.filled_rectangle(${w.x}, y_cursor - 10, ${w.width}, 2, ${color});`);
+                            lines.push(`                  for (JsonVariant entry : entries) {`);
+                            lines.push(`                      if (y_cursor > ${w.y} + ${w.height} - 40) break;`);
+                            lines.push(`                      const char* summary = entry["summary"];`);
+                            lines.push(`                      const char* start = entry["start"];`);
+                            lines.push(`                      it.printf(${w.x} + 20, y_cursor, id(${fontEventDay}), ${color}, TextAlign::TOP_LEFT, "%d", entry["day"].as<int>());`);
+                            lines.push(`                      it.printf(${w.x} + 60, y_cursor, id(${fontEvent}), ${color}, TextAlign::TOP_LEFT, "%.15s...", summary);`);
+                            lines.push(`                      std::string timeStr = extract_time(start);`);
+                            lines.push(`                      it.printf(${w.x} + ${w.width} - 10, y_cursor, id(${fontEvent}), ${color}, TextAlign::TOP_RIGHT, "%s", timeStr.c_str());`);
+                            lines.push(`                      y_cursor += 40;`);
+                            lines.push(`                  }`);
+                            lines.push(`              }`);
+                            lines.push(`              return true;`);
+                            lines.push(`             });`);
+                            lines.push(`          }`);
+                            lines.push(`        }`);
                         } else if (t === "qr_code") {
                             const value = (p.value || "https://esphome.io").replace(/"/g, '\\"');
                             const ecc = p.ecc || "LOW";

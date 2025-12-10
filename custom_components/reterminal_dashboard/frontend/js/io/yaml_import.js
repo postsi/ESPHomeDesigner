@@ -216,10 +216,11 @@ function parseSnippetYamlOffline(yamlText) {
         const widgets = getCurrentPageWidgets();
 
         if (skipRendering) {
-            if (trimmed === "}" || trimmed === "}}" || trimmed.startsWith("//") || !trimmed.match(/^it\./)) {
+            // Only stop skipping if we see a new widget marker
+            // We use a regex to match "// widget:" with optional spaces
+            if (trimmed.match(/^\/\/\s*widget:/)) {
                 skipRendering = false;
-            }
-            if (trimmed.match(/^it\./)) {
+            } else {
                 continue;
             }
         }
@@ -504,6 +505,19 @@ function parseSnippetYamlOffline(yamlText) {
                         else if (val === "false") widget.props[key] = false;
                         else widget.props[key] = val;
                     });
+                } else if (widgetType === "calendar") {
+                    widget.props = {
+                        entity_id: p.entity || "sensor.esp_calendar_data",
+                        border_width: parseInt(p.border_width || 2, 10),
+                        show_border: (p.show_border !== "false"),
+                        border_color: p.border_color || "black",
+                        background_color: p.background_color || "white",
+                        text_color: p.text_color || "black",
+                        font_size_date: parseInt(p.font_size_date || 100, 10),
+                        font_size_day: parseInt(p.font_size_day || 24, 10),
+                        font_size_grid: parseInt(p.font_size_grid || 14, 10),
+                        font_size_event: parseInt(p.font_size_event || 18, 10)
+                    };
                 }
 
                 widgets.push(widget);

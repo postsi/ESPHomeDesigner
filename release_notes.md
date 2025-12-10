@@ -18,6 +18,12 @@
   - **Prefix & Suffix**: Added settings for custom prefix and suffix text.
 - **Time & Date Widget**: Added more formatting options for date display.
 
+#### Calendar Widget
+- **Full-Featured Calendar**: Monthly view with upcoming events list
+- **Customizable**: Configurable font sizes for all elements (Date, Day, Grid, Events), plus colors and border settings
+- **Smart Setup**: Built-in Python helper script downloader simplifies Home Assistant integration
+- **Accurate Preview**: What you see is what you get - preview reflects real dates and layout
+
 ### 🐛 Bug Fixes
 - **Feature Forecast**: Resolved bug fixes for the weather forecast feature; it should now work correctly.
 - **Graph Widget**: Fixed issue where graphs would intersect/overlap incorrectly.
@@ -133,7 +139,8 @@
 - Color rendering for all widgets and shapes
 - Same easy workflow as E1001 - just select your device type
 
-#### TRMNL (ESP32-C3)
+
+#### trmnl (ESP32-C3)
 - **New device support**: TRMNL e-paper hardware now fully supported
 - Dedicated hardware template (`trmnl_lambda.yaml`)
 - Correct SPI and battery sensor configurations

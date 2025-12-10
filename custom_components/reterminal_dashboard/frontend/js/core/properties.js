@@ -3,6 +3,126 @@
 // on, EVENTS from events.js
 // getAvailableColors, getDeviceModel from device.js
 
+// ============================================================================
+// HELPER SCRIPTS
+// ============================================================================
+
+const CALENDAR_HELPER_SCRIPT = `# Dictionary to map calendar keys to their corresponding names
+# One word calandars don't need to be added calendar.jobs would map to Jobs by default without adding it here
+# calendar.hello_world should be added on the other hand
+CALENDAR_NAMES = {"calendar.x": "X", "calendar.Y": "Y"}
+# Day names (which are displayed in the calendar event list) can be translated here if required
+DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+# How many entries to send to the ESPHome device
+MAX_ENTRIES = 8
+
+def convert_calendar_format(data, today):
+    # Initialize a dictionary to store events grouped by date
+    events_by_date = {}
+    entrie_count = 0
+    
+    # Variable to store the end time of the closest event that will end
+    closest_end_time = None
+    
+    # Iterate through calendar keys and events
+    for calendar_key, events_list in data.items():
+        for event in events_list['events']:
+            if 'description' in event:
+                event.pop('description')
+                
+            # Attempt to split the 'event[start]' into date and time parts
+            parts = event['start'].split("T")
+            event_date = parts[0]
+            event_time = parts[1] if len(parts) > 1 else None  # event_time might not be present
+            
+            # Compare the event_date with today's date
+            if event_date < today:
+                # If the event's date is before today, update it to today's date (in case of multi day event starting before today)
+                event['start'] = today if event_time is None else f"{today}T{event_time}"
+                event_date = today
+            
+            # Add calendar name to event
+            # If calendar key exists in CALENDAR_NAMES, use its value, otherwise capitalize the second part of the key
+            event['calendar_name'] = CALENDAR_NAMES.get(calendar_key, calendar_key.split(".")[1].capitalize())
+            
+            # Parse location_name and location_address
+            if 'location' in event:
+                # Split the 'location' string into lines based on the newline character
+                location_lines = event['location'].split('\\n')
+                if len(location_lines) >= 2:
+                    # If there are at least two lines, consider the first line as 'location_name' and the second line as 'location_address'
+                    event['location_name'] = location_lines[0]
+                    # event['location_address'] = location_lines[1]
+                elif len(location_lines) == 1:
+                    # If there's only one line, consider it as 'location_name'
+                    event['location_name'] = location_lines[0]
+                    
+                # Remove the 'location' key from the event since it's been parsed into 'location_name' and 'location_address'
+                event.pop('location')
+                    
+            # Add event to events_by_date dictionary
+            if event_date in events_by_date:
+                events_by_date[event_date].append(event)
+            else:
+                events_by_date[event_date] = [event]
+                
+    # Sort events by date
+    sorted_dates = sorted(events_by_date.keys())
+    
+    # Initialize a list to store the final date objects
+    result = []
+    
+    # Iterate through sorted dates
+    for date in sorted_dates:
+        all_day_events = []
+        other_events = []
+        for event in events_by_date[date]:
+            if entrie_count == MAX_ENTRIES:
+                break
+            
+            # Check if the event lasts for the whole day
+            start_date = event['start']
+            end_date = event['end']
+            if 'T' not in event['start']:
+                all_day_events.append(event)
+            else:
+                other_events.append(event)
+                
+            entrie_count = entrie_count + 1
+        
+        if other_events and date == today:
+            closest_end_time = sorted(other_events, key=lambda item:dt_util.parse_datetime(item['end']), reverse=False)[0]["end"]
+        
+        if all_day_events or other_events:
+            # Sort other_events by start time
+            other_events.sort(key=lambda item:dt_util.parse_datetime(item['start']), reverse=False)
+            
+            # Construct dictionary for the date
+            # is_today cast to int because a bool somehow crashes my esphome config
+            day_item = {
+                'date': date,
+                'day': dt_util.parse_datetime(date).day,
+                'is_today': int(date == dt_util.now().isoformat().split("T")[0]),
+                'day_name': DAY_NAMES[dt_util.parse_datetime(date).weekday()],
+                'all_day': all_day_events,
+                'other': other_events
+            }
+            result.append(day_item)
+        
+    return (result, closest_end_time)
+
+# Access the data received from the Home Assistant service call
+input_data = data["calendar"]
+today = data["now"]
+
+# Convert the received data into the format expected by the epaper display
+converted_data = convert_calendar_format(input_data, today)
+
+# Pass the output back to Home Assistant
+output["entries"] = converted_data[0]
+output["closest_end_time"] = converted_data[1]
+`;
+
 class PropertiesPanel {
     constructor() {
         this.panel = document.getElementById("propertiesPanel");
@@ -661,6 +781,44 @@ class PropertiesPanel {
             this.addHint("Automatically reduce font size if text is too long");
             this.addCheckbox("Italic Quote", props.italic_quote !== false, (v) => updateProp("italic_quote", v));
         }
+        else if (type === "calendar") {
+            this.addSectionLabel("Appearance");
+            this.addSelect("Text Color", props.text_color || "black", colors, (v) => updateProp("text_color", v));
+            this.addSelect("Border Color", props.border_color || "black", colors, (v) => updateProp("border_color", v));
+            this.addSelect("Background", props.background_color || "white", colors, (v) => updateProp("background_color", v));
+
+            this.addLabeledInput("Border Width", "number", props.border_width || 2, (v) => updateProp("border_width", parseInt(v, 10)));
+            this.addCheckbox("Show Border", props.show_border !== false, (v) => updateProp("show_border", v));
+
+            this.addSectionLabel("Font Sizes");
+            this.addLabeledInput("Big Date Size", "number", props.font_size_date || 100, (v) => updateProp("font_size_date", parseInt(v, 10)));
+            this.addLabeledInput("Day Name Size", "number", props.font_size_day || 24, (v) => updateProp("font_size_day", parseInt(v, 10)));
+            this.addLabeledInput("Grid Text Size", "number", props.font_size_grid || 14, (v) => updateProp("font_size_grid", parseInt(v, 10)));
+            this.addLabeledInput("Event Text Size", "number", props.font_size_event || 18, (v) => updateProp("font_size_event", parseInt(v, 10)));
+
+            this.addSectionLabel("Data");
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "sensor.esp_calendar_data", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Must be a sensor with attribute 'entries'");
+
+            // Helper Script Download
+            const dlBtn = document.createElement("button");
+            dlBtn.className = "btn btn-secondary btn-full";
+            dlBtn.textContent = "Download Helper Script";
+            dlBtn.style.marginTop = "10px";
+            dlBtn.addEventListener("click", () => {
+                const element = document.createElement('a');
+                element.setAttribute('href', 'data:text/x-python;charset=utf-8,' + encodeURIComponent(CALENDAR_HELPER_SCRIPT));
+                element.setAttribute('download', 'esp_calendar_data_conversion.py');
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+            });
+            this.panel.appendChild(dlBtn);
+            this.addHint("Place in /config/python_scripts/");
+        }
         else if (type === "puppet") {
             this.addLabeledInput("File path / URL", "text", props.image_url || "", (v) => updateProp("image_url", v));
             this.addHint('Tip: Use mdi:icon-name for Material Design Icons. <br><b>Important:</b> Ensure `materialdesignicons-webfont.ttf` is in your ESPHome `fonts/` folder. <a href="https://pictogrammers.com/library/mdi/" target="_blank" style="color: #52c7ea">MDI Library</a>');
@@ -748,6 +906,59 @@ class PropertiesPanel {
             this.addSelect("Knob/Bar Color", props.color || "black", colors, (v) => updateProp("color", v));
             this.addSelect("Track Color", props.bg_color || "gray", colors, (v) => updateProp("bg_color", v));
             this.addLabeledInput("Border Width", "number", props.border_width || 2, (v) => updateProp("border_width", parseInt(v, 10)));
+        }
+        else if (type === "calendar") {
+            this.addHint("📅 Displays a monthly calendar and agenda.");
+            this.addHint("⚠️ Requires 'esp_calendar_data_conversion.py' setup in Home Assistant.");
+
+            this.addLabeledInputWithPicker("Data Entity ID", "text", widget.props.entity_id || "sensor.esp_calendar_data", (v) => {
+                const newProps = { ...widget.props, entity_id: v };
+                AppState.updateWidget(widget.id, { props: newProps });
+            }, widget);
+
+            this.addSectionLabel("Appearance");
+            this.addCheckbox("Show Border", props.show_border !== false, (v) => updateProp("show_border", v));
+            this.addLabeledInput("Border Width", "number", props.border_width || 2, (v) => updateProp("border_width", parseInt(v, 10)));
+            this.addSelect("Border Color", props.border_color || "black", colors, (v) => updateProp("border_color", v));
+            this.addSelect("Background Color", props.background_color || "white", colors, (v) => updateProp("background_color", v));
+            this.addSelect("Text Color", props.text_color || "black", colors, (v) => updateProp("text_color", v));
+
+            this.addSectionLabel("Font Sizes");
+            this.addLabeledInput("Big Date Size", "number", props.font_size_date || 100, (v) => updateProp("font_size_date", parseInt(v, 10)));
+            this.addLabeledInput("Day Name Size", "number", props.font_size_day || 24, (v) => updateProp("font_size_day", parseInt(v, 10)));
+            this.addLabeledInput("Grid Text Size", "number", props.font_size_grid || 14, (v) => updateProp("font_size_grid", parseInt(v, 10)));
+            this.addLabeledInput("Event Text Size", "number", props.font_size_event || 18, (v) => updateProp("font_size_event", parseInt(v, 10)));
+
+            // Add "Download Helper Script" button
+            const container = this.panel; // Or create a sub-container
+            const downloadBtn = document.createElement("button");
+            downloadBtn.className = "action-btn"; // Assuming this class exists or button basic style
+            downloadBtn.style.marginTop = "15px";
+            downloadBtn.style.width = "100%";
+            downloadBtn.style.cursor = "pointer";
+            downloadBtn.style.padding = "8px";
+            downloadBtn.innerHTML = "📥 Download Helper Script";
+
+            downloadBtn.onclick = () => {
+                const blob = new Blob([CALENDAR_HELPER_SCRIPT], { type: "text/x-python" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "esp_calendar_data_conversion.py";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+            container.appendChild(downloadBtn);
+
+            const note = document.createElement("div");
+            note.style.marginTop = "5px";
+            note.style.fontSize = "10px";
+            note.style.color = "#888";
+            note.style.textAlign = "center";
+            note.innerText = "Check widget instructions for HA setup.";
+            container.appendChild(note);
         }
     }
 
