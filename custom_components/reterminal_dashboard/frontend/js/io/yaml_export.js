@@ -80,6 +80,33 @@ const DEVICE_PROFILES = {
             buttons: false,
             sht4x: false
         }
+    },
+    esp32_s3_photopainter: {
+        name: "Waveshare PhotoPainter (7-Color)",
+        displayModel: "7.30in_f",
+        displayPlatform: "waveshare_epaper",
+        pins: {
+            display: { cs: "GPIO9", dc: "GPIO8", reset: "GPIO12", busy: "GPIO13" },
+            i2c: { sda: "GPIO2", scl: "GPIO1" },
+            spi: { clk: "GPIO10", mosi: "GPIO11" },
+            batteryEnable: null, // Managed by AXP2101
+            batteryAdc: null, // Managed by AXP2101
+            buzzer: null, // No simple buzzer
+            buttons: { left: "GPIO0", right: "GPIO4", refresh: null } // BOOT=0, KEY=4, No dedicated refresh
+        },
+        battery: {
+            attenuation: "0db", // Not used for AXP
+            multiplier: 1.0, // Not used for AXP
+            calibration: { min: 3.30, max: 4.20 } // Not used for AXP directly
+        },
+        features: {
+            psram: true,
+            buzzer: false,
+            buttons: true, // Only 2 buttons
+            sht4x: false, // Has SHTC3, different driver
+            axp2101: true,
+            shtc3: true // Start with basics, add SHTC3 later if needed or via generic i2c scan
+        }
     }
 };
 
@@ -146,13 +173,47 @@ function generateGlobalsSection(defaultRefreshS = 900, quoteWidgets = []) {
 /**
  * Generates I2C section for devices with I2C bus
  */
-function generateI2CSection(profile) {
+function generateI2CSection(profile, busId = "bus_a") {
     if (!profile.pins.i2c) return [];
     return [
         "i2c:",
         `  sda: ${profile.pins.i2c.sda}`,
         `  scl: ${profile.pins.i2c.scl}`,
         "  scan: true",
+        `  id: ${busId}`,
+        ""
+    ];
+}
+
+/**
+ * Generates AXP2101 PMIC section (Critical for PhotoPainter)
+ */
+function generateAXP2101Section(profile) {
+    if (!profile.features.axp2101) return [];
+    return [
+        "axp2101:",
+        "  i2c_id: bus_a",
+        "  address: 0x34",
+        "  irq_pin: GPIO21",
+        "  battery_voltage:",
+        "    name: \"Battery Voltage\"",
+        "    id: battery_voltage",
+        "  battery_level:",
+        "    name: \"Battery Level\"",
+        "    id: battery_level",
+        "  on_setup:",
+        "    - axp2101.set_ldo_voltage:",
+        "        id: bldo1",
+        "        voltage: 3300mv",
+        "    - switch.turn_on: bldo1  # EPD_VCC (Screen Power)",
+        "    - axp2101.set_ldo_voltage:",
+        "        id: aldo1",
+        "        voltage: 3300mv",
+        "    - switch.turn_on: aldo1  # Peripherals",
+        "    - axp2101.set_ldo_voltage:",
+        "        id: aldo3",
+        "        voltage: 3300mv",
+        "    - switch.turn_on: aldo3  # Backlight/Logic",
         ""
     ];
 }
@@ -249,38 +310,44 @@ function generateSensorSection(profile, widgetSensorLines = []) {
     }
 
     // Battery voltage sensor
-    lines.push("  # Battery Voltage");
-    lines.push("  - platform: adc");
-    lines.push(`    pin: ${profile.pins.batteryAdc}`);
-    lines.push("    name: \"Battery Voltage\"");
-    lines.push("    id: battery_voltage");
-    lines.push("    update_interval: 60s");
-    lines.push(`    attenuation: ${profile.battery.attenuation}`);
-    lines.push("    accuracy_decimals: 2");
-    lines.push("    filters:");
-    lines.push(`      - multiply: ${profile.battery.multiplier}`);
-    lines.push("      - round: 2");
-    lines.push("");
+    // Skip if AXP2101 is present (it handles battery monitoring)
+    if (!profile.features.axp2101) {
+        lines.push("  # Battery Voltage");
+        lines.push("  - platform: adc");
+        lines.push(`    pin: ${profile.pins.batteryAdc}`);
+        lines.push("    name: \"Battery Voltage\"");
+        lines.push("    id: battery_voltage");
+        lines.push("    update_interval: 60s");
+        lines.push(`    attenuation: ${profile.battery.attenuation}`);
+        lines.push("    accuracy_decimals: 2");
+        lines.push("    filters:");
+        lines.push(`      - multiply: ${profile.battery.multiplier}`);
+        lines.push("      - round: 2");
+        lines.push("");
+    }
 
     // Battery level template sensor
-    lines.push("  # Battery Level (calculated from voltage)");
-    lines.push("  - platform: template");
-    lines.push("    name: \"Battery Level\"");
-    lines.push("    id: battery_level");
-    lines.push("    lambda: 'return id(battery_voltage).state;'");
-    lines.push("    unit_of_measurement: \"%\"");
-    lines.push("    device_class: battery");
-    lines.push("    update_interval: 60s");
-    lines.push("    accuracy_decimals: 0");
-    lines.push("    filters:");
-    lines.push("      - calibrate_linear:");
-    lines.push(`          - ${profile.battery.calibration.min} -> 0.0`);
-    lines.push(`          - ${profile.battery.calibration.max} -> 100.0`);
-    lines.push("      - clamp:");
-    lines.push("          min_value: 0");
-    lines.push("          max_value: 100");
-    lines.push("      - round: 0");
-    lines.push("");
+    // Skip if AXP2101 is present
+    if (!profile.features.axp2101) {
+        lines.push("  # Battery Level (calculated from voltage)");
+        lines.push("  - platform: template");
+        lines.push("    name: \"Battery Level\"");
+        lines.push("    id: battery_level");
+        lines.push("    lambda: 'return id(battery_voltage).state;'");
+        lines.push("    unit_of_measurement: \"%\"");
+        lines.push("    device_class: battery");
+        lines.push("    update_interval: 60s");
+        lines.push("    accuracy_decimals: 0");
+        lines.push("    filters:");
+        lines.push("      - calibrate_linear:");
+        lines.push(`          - ${profile.battery.calibration.min} -> 0.0`);
+        lines.push(`          - ${profile.battery.calibration.max} -> 100.0`);
+        lines.push("      - clamp:");
+        lines.push("          min_value: 0");
+        lines.push("          max_value: 100");
+        lines.push("      - round: 0");
+        lines.push("");
+    }
 
     // WiFi signal sensor
     lines.push("  # WiFi Signal Strength");
@@ -312,7 +379,7 @@ function generateBinarySensorSection(profile, numPages = 5) {
     // Left button - previous page
     lines.push("  - platform: gpio");
     lines.push("    id: button_left");
-    lines.push("    name: \"reTerminal Button Left\"");
+    lines.push("    name: \"Button Left\"");
     lines.push("    pin:");
     lines.push(`      number: ${profile.pins.buttons.left}`);
     lines.push("      mode: INPUT_PULLUP");
@@ -329,7 +396,7 @@ function generateBinarySensorSection(profile, numPages = 5) {
     // Right button - next page
     lines.push("  - platform: gpio");
     lines.push("    id: button_right");
-    lines.push("    name: \"reTerminal Button Right\"");
+    lines.push("    name: \"Button Right\"");
     lines.push("    pin:");
     lines.push(`      number: ${profile.pins.buttons.right}`);
     lines.push("      mode: INPUT_PULLUP");
@@ -344,17 +411,19 @@ function generateBinarySensorSection(profile, numPages = 5) {
     lines.push("");
 
     // Refresh button
-    lines.push("  - platform: gpio");
-    lines.push("    id: button_refresh");
-    lines.push("    name: \"reTerminal Button Refresh\"");
-    lines.push("    pin:");
-    lines.push(`      number: ${profile.pins.buttons.refresh}`);
-    lines.push("      mode: INPUT_PULLUP");
-    lines.push("      inverted: true");
-    lines.push("    on_press:");
-    lines.push("      then:");
-    lines.push("        - component.update: epaper_display");
-    lines.push("");
+    if (profile.pins.buttons.refresh) {
+        lines.push("  - platform: gpio");
+        lines.push("    id: button_refresh");
+        lines.push("    name: \"Button Refresh\"");
+        lines.push("    pin:");
+        lines.push(`      number: ${profile.pins.buttons.refresh}`);
+        lines.push("      mode: INPUT_PULLUP");
+        lines.push("      inverted: true");
+        lines.push("    on_press:");
+        lines.push("      then:");
+        lines.push("        - component.update: epaper_display");
+        lines.push("");
+    }
 
     return lines;
 }
@@ -400,7 +469,7 @@ function generateButtonSection(profile, numPages = 5) {
 
     lines.push("  # Page Navigation (Home Assistant control)");
     lines.push("  - platform: template");
-    lines.push(`    name: "${devicePrefix === 'reterminal' ? 'reTerminal' : 'TRMNL'} Next Page"`);
+    lines.push("    name: \"Next Page\"");
     lines.push(`    id: ${devicePrefix}_next_page`);
     lines.push("    on_press:");
     lines.push("      - lambda: |-");
@@ -410,7 +479,7 @@ function generateButtonSection(profile, numPages = 5) {
     lines.push("");
 
     lines.push("  - platform: template");
-    lines.push(`    name: "${devicePrefix === 'reterminal' ? 'reTerminal' : 'TRMNL'} Previous Page"`);
+    lines.push("    name: \"Previous Page\"");
     lines.push(`    id: ${devicePrefix}_prev_page`);
     lines.push("    on_press:");
     lines.push("      - lambda: |-");
@@ -420,7 +489,7 @@ function generateButtonSection(profile, numPages = 5) {
     lines.push("");
 
     lines.push("  - platform: template");
-    lines.push(`    name: "${devicePrefix === 'reterminal' ? 'reTerminal' : 'TRMNL'} Refresh Display"`);
+    lines.push("    name: \"Refresh Display\"");
     lines.push(`    id: ${devicePrefix}_refresh_display`);
     lines.push("    on_press:");
     lines.push("      - component.update: epaper_display");
@@ -429,7 +498,8 @@ function generateButtonSection(profile, numPages = 5) {
     // Individual page buttons
     for (let i = 0; i < numPages; i++) {
         lines.push("  - platform: template");
-        lines.push(`    name: "${devicePrefix === 'reterminal' ? 'reTerminal' : 'TRMNL'} Go to Page ${i + 1}"`);
+        // name: "Go to Page 1"
+        lines.push(`    name: "Go to Page ${i + 1}"`);
         lines.push(`    id: ${devicePrefix}_goto_page_${i}`);
         lines.push("    on_press:");
         lines.push(`      - lambda: 'id(display_page) = ${i};'`);
@@ -664,13 +734,17 @@ function generateSnippetLocally() {
     addFont("Roboto", 400, 14);
     addFont("Roboto", 400, 20);
 
-    // Get device model for header
-    const headerDeviceModel = getDeviceModel();
+    // Get device model for header and profile lookup
+    const deviceModel = getDeviceModel();
+    const profile = DEVICE_PROFILES[deviceModel] || DEVICE_PROFILES.reterminal_e1001;
+
     let deviceDisplayName = "reTerminal E1001 (Monochrome)";
-    if (headerDeviceModel === "reterminal_e1002") {
+    if (deviceModel === "reterminal_e1002") {
         deviceDisplayName = "reTerminal E1002 (6-Color)";
-    } else if (headerDeviceModel === "trmnl") {
+    } else if (deviceModel === "trmnl") {
         deviceDisplayName = "Official TRMNL (ESP32-C3)";
+    } else if (deviceModel === "esp32_s3_photopainter") {
+        deviceDisplayName = "Waveshare PhotoPainter (7-Color)";
     }
 
     lines.push("# ============================================================================");
@@ -679,18 +753,24 @@ function generateSnippetLocally() {
     lines.push(`# TARGET DEVICE: ${deviceDisplayName}`);
 
     // Add device-specific specs
-    if (headerDeviceModel === "reterminal_e1002") {
+    if (deviceModel === "reterminal_e1002") {
         lines.push("#         - Display: 7.5\" Seeed e-Paper (800x480, 6-Color)");
         lines.push("#         - Battery: Yes (LiPo with ADC on GPIO1)");
         lines.push("#         - Buttons: Yes (3 physical buttons)");
         lines.push("#         - Buzzer: Yes (GPIO45)");
         lines.push("#         - Onboard Sensors: Temperature & Humidity (SHT4x)");
         lines.push("#         - NOTE: Requires ESPHome 2025.11.0+");
-    } else if (headerDeviceModel === "trmnl") {
+    } else if (deviceModel === "trmnl") {
         lines.push("#         - Display: 7.5\" Waveshare e-Paper (800x480, Monochrome)");
         lines.push("#         - Battery: Yes (LiPo with ADC on GPIO0)");
         lines.push("#         - Buttons: None");
         lines.push("#         - Buzzer: None");
+    } else if (deviceModel === "esp32_s3_photopainter") {
+        lines.push("#         - Display: 7.3\" Waveshare e-Paper (800x480, 7-Color)");
+        lines.push("#         - Battery: Yes (Managed by AXP2101)");
+        lines.push("#         - Buttons: Yes (Boot/Key)");
+        lines.push("#         - Audio: Speaker (ES8311 - Pending media_player support)");
+        lines.push("#         - PMIC: AXP2101 (Power Management)");
     } else {
         lines.push("#         - Display: 7.5\" Waveshare e-Paper (800x480, Monochrome)");
         lines.push("#         - Battery: Yes (LiPo with ADC on GPIO1)");
@@ -710,13 +790,24 @@ function generateSnippetLocally() {
     lines.push("# STEP 2: Create a new device in ESPHome");
     lines.push("#         - Click \"New Device\"");
     lines.push("#         - Name: reterminal (or your choice)");
-    if (headerDeviceModel === "trmnl") {
+    if (deviceModel === "trmnl") {
         lines.push("#         - Select: ESP32-C3");
     } else {
         lines.push("#         - Select: ESP32-S3");
     }
     lines.push("#         - ESPHome will auto-generate a basic config");
     lines.push("#");
+
+    // Add external_components (Required for AXP2101 on PhotoPainter)
+    if (deviceModel === "esp32_s3_photopainter") {
+        lines.push("# STEP 2.5: Add external_components for AXP2101");
+        lines.push("#           (Paste this after esphome: section)");
+        lines.push("#");
+        lines.push("#         external_components:");
+        lines.push("#           - source: github://lewisxhe/esphome-axp2101");
+        lines.push("#");
+    }
+
     lines.push("# STEP 3: Add this on_boot section to your esphome: section:");
     lines.push("#");
     lines.push("#         esphome:");
@@ -725,7 +816,7 @@ function generateSnippetLocally() {
     lines.push("#           on_boot:");
     lines.push("#             priority: 600");
     lines.push("#             then:");
-    if (headerDeviceModel !== "trmnl") {
+    if (deviceModel !== "trmnl" && profile.pins.batteryEnable) {
         lines.push("#               - output.turn_on: bsp_battery_enable");
     }
     lines.push("#               - delay: 2s");
@@ -1136,12 +1227,18 @@ function generateSnippetLocally() {
     // Generated from device profile - replaces template sensor sections
     // ========================================================================
 
-    const deviceModel = getDeviceModel();
-    const profile = DEVICE_PROFILES[deviceModel] || DEVICE_PROFILES.reterminal_e1001;
+    // Note: profile already defined at top of function
     const numPages = pagesLocal.length || 5;
 
     // Generate globals section (required for navigation, refresh, and quote storage)
     lines.push(...generateGlobalsSection(900, quoteRssWidgetsEarly));
+
+    // Generate external_components section (Critical for PhotoPainter AXP2101)
+    if (deviceModel === "esp32_s3_photopainter") {
+        lines.push("external_components:");
+        lines.push("  - source: github://lewisxhe/esphome-axp2101");
+        lines.push("");
+    }
 
     // Generate PSRAM section (ESP32-S3 devices only)
     lines.push(...generatePSRAMSection(profile));
@@ -1217,6 +1314,9 @@ function generateSnippetLocally() {
 
     // Generate SPI section
     lines.push(...generateSPISection(profile));
+
+    // Generate AXP2101 section (PhotoPainter)
+    lines.push(...generateAXP2101Section(profile));
 
     // Generate output section (battery enable, buzzer)
     lines.push(...generateOutputSection(profile));
@@ -1555,6 +1655,21 @@ function generateSnippetLocally() {
         lines.push("      number: GPIO4");
         lines.push("      inverted: true");
         lines.push("    update_interval: never");
+    } else if (deviceModel === "esp32_s3_photopainter") {
+        // Waveshare PhotoPainter (7-Color) configuration
+        lines.push("  # Device: Waveshare PhotoPainter (7-Color)");
+        lines.push("  - platform: waveshare_epaper");
+        lines.push("    id: epaper_display");
+        lines.push("    model: 7.30in_f");
+        lines.push(`    cs_pin: ${profile.pins.display.cs}`);
+        lines.push(`    dc_pin: ${profile.pins.display.dc}`);
+        lines.push("    reset_pin:");
+        lines.push(`      number: ${profile.pins.display.reset}`);
+        lines.push("      inverted: false");
+        lines.push("    busy_pin:");
+        lines.push(`      number: ${profile.pins.display.busy}`);
+        lines.push("      inverted: true");
+        lines.push("    update_interval: never");
     } else {
         // Default / E1001 configuration (Waveshare)
         lines.push("  # Device: reTerminal E1001 (Monochrome E-Paper)");
@@ -1587,8 +1702,20 @@ function generateSnippetLocally() {
             lines.push("      const auto COLOR_GREEN = Color(0, 255, 0, 0);");
             lines.push("      const auto COLOR_BLUE = Color(0, 0, 255, 0);");
             lines.push("      const auto COLOR_YELLOW = Color(255, 255, 0, 0);");
+        } else if (getDeviceModel() === "esp32_s3_photopainter") {
+            // PhotoPainter is a 7-color display - use proper RGBA values
+            lines.push("      const auto COLOR_BLACK = Color(0, 0, 0, 0);");
+            lines.push("      const auto COLOR_WHITE = Color(255, 255, 255, 0);");
+            lines.push("      const auto COLOR_GREEN = Color(0, 255, 0, 0);");
+            lines.push("      const auto COLOR_BLUE = Color(0, 0, 255, 0);");
+            lines.push("      const auto COLOR_RED = Color(255, 0, 0, 0);");
+            lines.push("      const auto COLOR_YELLOW = Color(255, 255, 0, 0);");
+            lines.push("      const auto COLOR_ORANGE = Color(255, 165, 0, 0);");
+            // Map ON/OFF to Black/White for compatibility with basic widgets
+            lines.push("      const auto COLOR_ON = COLOR_BLACK;");
+            lines.push("      const auto COLOR_OFF = COLOR_WHITE;");
         } else {
-            // E1001 is a binary display - use 0/1
+            // E1001/TRMNL are binary displays - use 0/1
             lines.push("      Color COLOR_ON = Color(1);");
             lines.push("      Color COLOR_OFF = Color(0);");
         }
@@ -1816,7 +1943,7 @@ function generateSnippetLocally() {
                                         suffixExpr = `"${resolvedUnit}${postfix}"`;
                                     } else {
                                         // Fallback: use native sensor unit from ESPHome runtime
-                                        suffixExpr = `(id(${safeEntityId}).get_unit_of_measurement() + "${postfix}").c_str()`;
+                                        suffixExpr = `(id(${safeEntityId}).get_unit_of_measurement_ref() + "${postfix}").c_str()`;
                                     }
                                 }
 
@@ -2144,7 +2271,17 @@ function generateSnippetLocally() {
                             const pctFontRef = `font_roboto_400_${fontSize}`;
                             usedFontIds.add(pctFontRef);
 
-                            const sensorId = (p.is_local_sensor) ? "battery_level" : (entityId ? entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") : "battery_level");
+                            let sensorId;
+                            if (p.is_local_sensor) {
+                                sensorId = "battery_level";
+                            } else {
+                                // Fix for legacy/broken default ID
+                                if (entityId === "sensor.reterminal_e1001_battery_level") {
+                                    sensorId = "battery_level";
+                                } else {
+                                    sensorId = entityId ? entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") : "battery_level";
+                                }
+                            }
 
                             lines.push(`        // widget:battery_icon id:${w.id} type:battery_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "battery_level"} size:${size} font_size:${fontSize} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
                             lines.push(`        {`);
@@ -2289,7 +2426,7 @@ function generateSnippetLocally() {
                             // IMPORTANT: We need `json:` in config if not present. 
                             lines.push(`          // Events`);
                             lines.push(`          if (id(calendar_json_${w.id}).state != "unknown" && id(calendar_json_${w.id}).state.length() > 2) {`);
-                            lines.push(`             json::parse_json(id(calendar_json_${w.id}).state, [](JsonObject root) -> bool {`);
+                            lines.push(`             json::parse_json(id(calendar_json_${w.id}).state, [&](JsonObject root) -> bool {`);
                             // Note: parse_json yields the root object/array. The input is an array of entries? 
                             // The reference does: deserializeJson(doc, json_string); JsonArray entries = doc.as<JsonArray>();
                             // In ESPHome lambda `json::parse_json`: 
@@ -2309,7 +2446,7 @@ function generateSnippetLocally() {
 
                             // If `entries` is a list `[...]`, `parse_json` might fail if it expects `{}`.
                             // Let's rely on standard ArduinoJson `deserializeJson` locally since we are in a lambda.
-                            lines.push(`              DynamicJsonDocument doc(4096);`);
+                            lines.push(`              JsonDocument doc;`);
                             lines.push(`              DeserializationError error = deserializeJson(doc, id(calendar_json_${w.id}).state.c_str());`);
                             lines.push(`              if (!error) {`);
                             lines.push(`                  JsonArray entries = doc.as<JsonArray>();`);

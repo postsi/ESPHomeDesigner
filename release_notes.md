@@ -24,6 +24,10 @@
 - **Smart Setup**: Built-in Python helper script downloader simplifies Home Assistant integration
 - **Accurate Preview**: What you see is what you get - preview reflects real dates and layout
 
+### 📱 New Hardware Support
+- **Waveshare PhotoPainter (ESP32-S3)**: Full support for the Waveshare ESP32-S3 PhotoPainter (7-Color E-Ink).
+
+
 ### 🐛 Bug Fixes
 - **Feature Forecast**: Resolved bug fixes for the weather forecast feature; it should now work correctly.
 - **Graph Widget**: Fixed issue where graphs would intersect/overlap incorrectly.

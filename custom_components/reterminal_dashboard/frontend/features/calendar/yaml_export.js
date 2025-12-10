@@ -199,35 +199,29 @@ text_sensor:
           // Requires built-in JSON support in ESPHome (json component)
           // Data source: id(calendar_json_${id}).state
           
-          /*
-          DynamicJsonDocument doc(4096);
-          DeserializationError error = deserializeJson(doc, id(calendar_json_${id}).state.c_str());
-          
-          if (!error) {
-              JsonArray entries = doc.as<JsonArray>();
-              int y_cursor = calendar_y_pos + (7 * cell_height) + 20;
-              
-              it.filled_rectangle(${x}, y_cursor - 10, ${w}, 2, color_content);
-              
-              for (JsonVariant entry : entries) {
-                  if (y_cursor > ${y} + ${h} - 40) break;
-                  
-                  const char* summary = entry["summary"]; // "Meeting"
-                  const char* start = entry["start"]; // "2023-10-10T10:00:00"
-                  
-                  // Simplified drawing
-                  it.printf(${x} + 20, y_cursor, id(font_roboto_24), color_content, TextAlign::TOP_LEFT, "%d", entry["day"].as<int>());
-                  it.printf(${x} + 60, y_cursor, id(font_roboto_18), color_content, TextAlign::TOP_LEFT, "%.15s...", summary);
-                  
-                  std::string timeStr = extract_time(start);
-                  it.printf(${x} + ${w} - 10, y_cursor, id(font_roboto_18), color_content, TextAlign::TOP_RIGHT, "%s", timeStr.c_str());
-                  
-                  y_cursor += 40;
-              }
-          }
-          */
-          // Note: Full JSON deserialization in lambda might be risky without increasing stack size or using ArduinoJson carefully.
-          // For now, I'm uncommenting the block but user needs to ensure ArduinoJson is available (esphome usually includes it).
+           json::parse_json(id(calendar_json_${id}).state, [&](JsonObject root) -> bool {
+               JsonArray entries = root.as<JsonArray>();
+               int y_cursor = calendar_y_pos + (7 * cell_height) + 20;
+               
+               it.filled_rectangle(${x}, y_cursor - 10, ${w}, 2, color_content);
+               
+               for (JsonVariant entry : entries) {
+                   if (y_cursor > ${y} + ${h} - 40) break;
+                   
+                   const char* summary = entry["summary"]; // "Meeting"
+                   const char* start = entry["start"]; // "2023-10-10T10:00:00"
+                   
+                   // Simplified drawing
+                   it.printf(${x} + 20, y_cursor, id(font_roboto_24), color_content, TextAlign::TOP_LEFT, "%d", entry["day"].as<int>());
+                   it.printf(${x} + 60, y_cursor, id(font_roboto_18), color_content, TextAlign::TOP_LEFT, "%.15s...", summary);
+                   
+                   std::string timeStr = extract_time(start);
+                   it.printf(${x} + ${w} - 10, y_cursor, id(font_roboto_18), color_content, TextAlign::TOP_RIGHT, "%s", timeStr.c_str());
+                   
+                   y_cursor += 40;
+               }
+               return true;
+           });
       }
     `;
 

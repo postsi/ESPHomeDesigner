@@ -860,6 +860,9 @@ class PropertiesPanel {
             this.addSelect("Color", props.color || "blue", colors, (v) => updateProp("color", v));
         }
         else if (type === "lvgl_chart") {
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
             this.addLabeledInput("Title", "text", props.title || "", (v) => updateProp("title", v));
             this.addSelect("Type", props.type || "LINE", ["LINE", "SCATTER", "BAR"], (v) => updateProp("type", v));
             this.addLabeledInput("Min Value", "number", props.min || 0, (v) => updateProp("min", parseInt(v, 10)));
