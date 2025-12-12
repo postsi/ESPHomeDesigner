@@ -106,12 +106,12 @@ function openEntityPickerForWidget(widget, inputEl, callback) {
                 if (callback) {
                     callback(e.entity_id);
                 }
-                
+
                 // Update input element if provided
                 if (inputEl) {
                     inputEl.value = e.entity_id;
                 }
-                
+
                 // Update widget if provided
                 if (widget && window.AppState) {
                     // Update entity_id and title
@@ -137,13 +137,40 @@ function openEntityPickerForWidget(widget, inputEl, callback) {
                         }
                     }
 
-                    // Automate Unit for Sensor Text
-                    if (widget.type === "sensor_text" && e.attributes && e.attributes.unit_of_measurement) {
-                        const newProps = { ...widget.props, unit: e.attributes.unit_of_measurement };
+                    // Automate Unit for Sensor Text AND auto-detect text sensors
+                    if (widget.type === "sensor_text") {
+                        const newProps = { ...widget.props };
+
+                        // Auto-populate unit from attributes if available
+                        if (e.attributes && e.attributes.unit_of_measurement) {
+                            newProps.unit = e.attributes.unit_of_measurement;
+                        }
+
+                        // Auto-detect text sensor: if state is non-numeric, mark as text sensor
+                        // This helps handle sensor.* entities that return text values
+                        const stateVal = e.state;
+                        const isExplicitTextDomain = e.entity_id.startsWith("weather.") || e.entity_id.startsWith("text_sensor.");
+
+                        if (isExplicitTextDomain) {
+                            // Explicit text domain - always mark as text sensor
+                            newProps.is_text_sensor = true;
+                        } else if (stateVal !== undefined && stateVal !== null && stateVal !== "") {
+                            // Check if state value is non-numeric
+                            const numVal = parseFloat(stateVal);
+                            const isTextValue = isNaN(numVal);
+                            if (isTextValue) {
+                                newProps.is_text_sensor = true;
+                                console.log(`[entity_picker] Auto-detected text sensor: ${e.entity_id} (state: "${stateVal}")`);
+                            } else {
+                                // Explicitly set to false for numeric sensors
+                                newProps.is_text_sensor = false;
+                            }
+                        }
+
                         window.AppState.updateWidget(widget.id, { props: newProps });
                     }
                 }
-                
+
                 overlay.remove();
             });
 

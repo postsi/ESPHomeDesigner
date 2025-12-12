@@ -498,11 +498,14 @@
           </select>
         </div>
         <div class="field">
-          <div class="prop-label">Appearance</div>
+          <div class="prop-label">Canvas Background</div>
           <label style="display:flex;align-items:center;gap:6px;font-size:11px;">
             <input id="deviceDarkMode" type="checkbox" />
-            <span>Dark mode background (E-Ink simulation)</span>
+            <span>Dark mode (white elements on black background)</span>
           </label>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+            Toggle the canvas preview between white and black background.
+          </div>
         </div>
 
         <div class="form-group"
@@ -716,8 +719,8 @@
   <!-- Data/IO -->
   <script src="js/io/file_ops.js"></script>
   <script src="js/io/ha_api.js"></script>
-  <script src="js/io/yaml_import.js"></script>
-  <script src="js/io/yaml_export.js"></script>
+  <script src="js/io/yaml_import.js?v=3"></script>
+  <script src="js/io/yaml_export.js?v=3"></script>
   <script src="js/io/yaml_export_lvgl.js"></script>
 
   <!-- UI -->
@@ -742,9 +745,9 @@
   <script src="features/image/render.js"></script>
   <script src="features/online_image/render.js"></script>
   <script src="features/graph/render.js"></script>
-  <script src="features/qr_code/render.js"></script>
+  <script src="features/qr_code/render.js?v=2"></script>
   <script src="features/quote_rss/render.js"></script>
-  <script src="features/weather_forecast/render.js"></script>
+  <script src="features/weather_forecast/render.js?v=2"></script>
   <script src="features/lvgl_button/render.js"></script>
   <script src="features/lvgl_arc/render.js"></script>
   <script src="features/lvgl_chart/render.js"></script>

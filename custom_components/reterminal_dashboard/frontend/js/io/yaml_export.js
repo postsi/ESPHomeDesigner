@@ -5,7 +5,7 @@
 // Used to generate all hardware-related YAML sections (sensors, buttons, etc.)
 // ============================================================================
 
-const DEVICE_PROFILES = {
+window.DEVICE_PROFILES = {
     reterminal_e1001: {
         name: "reTerminal E1001 (Monochrome)",
         displayModel: "7.50inv2",
@@ -83,32 +83,730 @@ const DEVICE_PROFILES = {
     },
     esp32_s3_photopainter: {
         name: "Waveshare PhotoPainter (7-Color)",
-        displayModel: "7.30in_f",
+        displayModel: "7.30in-f",
         displayPlatform: "waveshare_epaper",
         pins: {
             display: { cs: "GPIO9", dc: "GPIO8", reset: "GPIO12", busy: "GPIO13" },
-            i2c: { sda: "GPIO2", scl: "GPIO1" },
+            i2c: { sda: "GPIO47", scl: "GPIO48" },
             spi: { clk: "GPIO10", mosi: "GPIO11" },
-            batteryEnable: null, // Managed by AXP2101
-            batteryAdc: null, // Managed by AXP2101
-            buzzer: null, // No simple buzzer
-            buttons: { left: "GPIO0", right: "GPIO4", refresh: null } // BOOT=0, KEY=4, No dedicated refresh
+            batteryEnable: null,
+            batteryAdc: null,
+            buzzer: null,
+            buttons: { left: "GPIO0", right: "GPIO4", refresh: null }
         },
         battery: {
-            attenuation: "0db", // Not used for AXP
-            multiplier: 1.0, // Not used for AXP
-            calibration: { min: 3.30, max: 4.20 } // Not used for AXP directly
+            attenuation: "0db",
+            multiplier: 1.0,
+            calibration: { min: 3.30, max: 4.20 }
         },
         features: {
             psram: true,
             buzzer: false,
-            buttons: true, // Only 2 buttons
-            sht4x: false, // Has SHTC3, different driver
+            buttons: true,
+            sht4x: false,
             axp2101: true,
-            shtc3: true // Start with basics, add SHTC3 later if needed or via generic i2c scan
+            manual_pmic: true,
+            shtc3: true
+        },
+        i2c_config: {
+            scan: false,
+            frequency: "10kHz"
+        }
+    },
+    guition_esp32_s3_4848s040: {
+        name: "Guition 4.0\" 480x480 (Untested)",
+        displayPlatform: "st7701s",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "GPIO19", scl: "GPIO45" },
+            spi: { clk: "GPIO48", mosi: "GPIO47" }
+        },
+        i2c_config: { scan: true },
+        backlight: { platform: "ledc", pin: "GPIO38", frequency: "100Hz" },
+        display_config: [
+            "  - platform: st7701s",
+            "    id: my_display",
+            "    update_interval: never",
+            "    auto_clear_enabled: False",
+            "    spi_mode: MODE3",
+            "    data_rate: 2MHz",
+            "    color_order: RGB",
+            "    invert_colors: False",
+            "    dimensions:",
+            "      width: 480",
+            "      height: 480",
+            "    cs_pin: GPIO39",
+            "    de_pin: GPIO18",
+            "    hsync_pin: GPIO16",
+            "    vsync_pin: GPIO17",
+            "    pclk_pin: GPIO21",
+            "    pclk_frequency: 12MHz",
+            "    pclk_inverted: False",
+            "    hsync_pulse_width: 8",
+            "    hsync_front_porch: 10",
+            "    hsync_back_porch: 20",
+            "    vsync_pulse_width: 8",
+            "    vsync_front_porch: 10",
+            "    vsync_back_porch: 10",
+            "    init_sequence:",
+            "      - 1",
+            "      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x10 ]",
+            "      - [ 0xCD, 0x00 ]",
+            "    data_pins:",
+            "      red: [11, 12, 13, 14, 0]",
+            "      green: [8, 20, 3, 46, 9, 10]",
+            "      blue: [4, 5, 6, 7, 15]"
+        ],
+        touch: { platform: "gt911", i2c_id: "bus_a", mirror_x: false }
+    },
+    sunton_esp32_8048s070: {
+        name: "Sunton 7.0\" 800x480 (Untested)",
+        displayPlatform: "rpi_dpi_rgb",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "19", scl: "20" }
+        },
+        audio: {
+            i2s_audio: { i2s_lrclk_pin: 12, i2s_bclk_pin: 11 },
+            speaker: { platform: "i2s_audio", dac_type: "external", i2s_dout_pin: 10, mode: "mono" }
+        },
+        backlight: { platform: "ledc", pin: "2", frequency: "1220Hz" },
+        display_config: [
+            "  - platform: rpi_dpi_rgb",
+            "    id: my_display",
+            "    color_order: RGB",
+            "    invert_colors: True",
+            "    update_interval: never",
+            "    auto_clear_enabled: false",
+            "    dimensions:",
+            "      width: 800",
+            "      height: 480",
+            "    de_pin: 41",
+            "    hsync_pin: 39",
+            "    vsync_pin: 40",
+            "    pclk_pin: 42",
+            "    pclk_frequency: 16MHz",
+            "    pclk_inverted: True",
+            "    hsync_pulse_width: 30",
+            "    hsync_front_porch: 210",
+            "    hsync_back_porch: 16",
+            "    vsync_pulse_width: 13",
+            "    vsync_front_porch: 22",
+            "    vsync_back_porch: 10",
+            "    data_pins:",
+            "      red: [14, 21, 47, 48, 45]",
+            "      green: [9, 46, 3, 8, 16, 1]",
+            "      blue: [15, 7, 6, 5, 4]"
+        ],
+        touch: { platform: "gt911", i2c_id: "bus_a", mirror_x: false, mirror_y: false }
+    },
+    waveshare_esp32_s3_touch_lcd_7: {
+        name: "Waveshare 7.0\" 800x480 (Untested)",
+        displayPlatform: "mipi_rgb",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "GPIO8", scl: "GPIO9" }
+        },
+        external_components: [
+            "  - source: github://oliverbeckhoff/esphome-ch422g@master"
+        ],
+        extra_components: [
+            "ch422g:",
+            "  - id: ch422g_hub"
+        ],
+        backlight: {
+            platform: "switch",
+            pin: { ch422g: "ch422g_hub", number: 2, mode: { output: true }, inverted: false }
+        },
+        display_config: [
+            "  - platform: mipi_rgb",
+            "    model: ESP32-S3-TOUCH-LCD-7-800X480",
+            "    id: my_display",
+            "    rotation: 90",
+            "    update_interval: never",
+            "    auto_clear_enabled: false",
+            "    color_order: RGB",
+            "    pclk_frequency: 16MHZ",
+            "    dimensions:",
+            "      width: 800",
+            "      height: 480",
+            "    reset_pin:",
+            "      ch422g: ch422g_hub",
+            "      number: 3",
+            "    de_pin: GPIO5",
+            "    hsync_pin: GPIO46",
+            "    vsync_pin: GPIO3",
+            "    pclk_pin: GPIO7",
+            "    pclk_inverted: true",
+            "    hsync_back_porch: 8",
+            "    hsync_front_porch: 8",
+            "    hsync_pulse_width: 4",
+            "    vsync_back_porch: 8",
+            "    vsync_front_porch: 8",
+            "    vsync_pulse_width: 4",
+            "    data_pins:",
+            "      red: [1, 2, 42, 41, 40]",
+            "      blue: [14, 38, 18, 17, 10]",
+            "      green: [39, 0, 45, 48, 47, 21]"
+        ],
+        touch: {
+            platform: "gt911",
+            i2c_id: "bus_a",
+            interrupt_pin: "GPIO4",
+            reset_pin: { ch422g: "ch422g_hub", number: 1, mode: "OUTPUT" }
+        }
+    },
+    elecrow_7_hmi: {
+        name: "Elecrow 7.0\" HMI (Untested)",
+        displayPlatform: "rpi_dpi_rgb",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "GPIO19", scl: "GPIO20" }
+        },
+        backlight: { platform: "ledc", pin: "GPIO2", frequency: "1220Hz" },
+        display_config: [
+            "  - platform: rpi_dpi_rgb",
+            "    id: my_display",
+            "    data_pins:",
+            "      red: [14, 21, 47, 48, 45]",
+            "      green: [9, 46, 3, 8, 16, 1]",
+            "      blue: [15, 7, 6, 5, 4]",
+            "    de_pin: GPIO41",
+            "    hsync_pin: 39",
+            "    vsync_pin: 40",
+            "    pclk_pin: 0",
+            "    hsync_front_porch: 40",
+            "    hsync_pulse_width: 48",
+            "    hsync_back_porch: 13",
+            "    vsync_front_porch: 1",
+            "    vsync_pulse_width: 31",
+            "    vsync_back_porch: 13",
+            "    pclk_inverted: true",
+            "    color_order: RGB",
+            "    auto_clear_enabled: false",
+            "    update_interval: never",
+            "    dimensions:",
+            "      width: 800",
+            "      height: 480"
+        ],
+        touch: { platform: "gt911", i2c_id: "bus_a", address: "0x5D", update_interval: "50ms" }
+    },
+    guition_esp32_jc4827w543: {
+        name: "Guition 4.3\" IPS 480x272 (Untested)",
+        displayPlatform: "qspi_dbi",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "GPIO8", scl: "GPIO4" },
+            spi: { id: "quad_spi", type: "quad", clk: "GPIO47", data_pins: [21, 48, 40, 39] }
+        },
+        backlight: { platform: "ledc", pin: "1", frequency: "1000Hz" },
+        display_config: [
+            "  - platform: qspi_dbi",
+            "    id: my_display",
+            "    update_interval: never",
+            "    auto_clear_enabled: False",
+            "    model: CUSTOM",
+            "    data_rate: 20MHz",
+            "    dimensions:",
+            "      width: 480",
+            "      height: 272",
+            "    cs_pin:",
+            "      number: 45",
+            "      ignore_strapping_warning: true",
+            "    invert_colors: true",
+            "    rotation: 180",
+            "    init_sequence:",
+            "      - [0xff,0xa5]",
+            "      - [0x36,0xc0]",
+            "      - [0x3A,0x01]",
+            "      - [0x41,0x03]",
+            "      - [0x44,0x15]",
+            "      - [0x45,0x15]",
+            "      - [0x7d,0x03]",
+            "      - [0xc1,0xbb]",
+            "      - [0xc2,0x05]",
+            "      - [0xc3,0x10]",
+            "      - [0xc6,0x3e]",
+            "      - [0xc7,0x25]",
+            "      - [0xc8,0x11]",
+            "      - [0x7a,0x5f]",
+            "      - [0x6f,0x44]",
+            "      - [0x78,0x70]",
+            "      - [0xc9,0x00]",
+            "      - [0x67,0x21]",
+            "      - [0x51,0x0a]",
+            "      - [0x52,0x76]",
+            "      - [0x53,0x0a]",
+            "      - [0x54,0x76]",
+            "      - [0x46,0x0a]",
+            "      - [0x47,0x2a]",
+            "      - [0x48,0x0a]",
+            "      - [0x49,0x1a]",
+            "      - [0x56,0x43]",
+            "      - [0x57,0x42]",
+            "      - [0x58,0x3c]",
+            "      - [0x59,0x64]",
+            "      - [0x5a,0x41]",
+            "      - [0x5b,0x3c]",
+            "      - [0x5c,0x02]",
+            "      - [0x5d,0x3c]",
+            "      - [0x5e,0x1f]",
+            "      - [0x60,0x80]",
+            "      - [0x61,0x3f]",
+            "      - [0x62,0x21]",
+            "      - [0x63,0x07]",
+            "      - [0x64,0xe0]",
+            "      - [0x65,0x02]",
+            "      - [0xca,0x20]",
+            "      - [0xcb,0x52]",
+            "      - [0xcc,0x10]",
+            "      - [0xcd,0x42]",
+            "      - [0xd0,0x20]",
+            "      - [0xd1,0x52]",
+            "      - [0xd2,0x10]",
+            "      - [0xd3,0x42]",
+            "      - [0xd4,0x0a]",
+            "      - [0xd5,0x32]",
+            "      - [0x80,0x00]",
+            "      - [0xa0,0x00]",
+            "      - [0x81,0x07]",
+            "      - [0xa1,0x06]",
+            "      - [0x82,0x02]",
+            "      - [0xa2,0x01]",
+            "      - [0x86,0x11]",
+            "      - [0xa6,0x10]",
+            "      - [0x87,0x27]",
+            "      - [0xa7,0x27]",
+            "      - [0x83,0x37]",
+            "      - [0xa3,0x37]",
+            "      - [0x84,0x35]",
+            "      - [0xa4,0x35]",
+            "      - [0x85,0x3f]",
+            "      - [0xa5,0x3f]",
+            "      - [0x88,0x0b]",
+            "      - [0xa8,0x0b]",
+            "      - [0x89,0x14]",
+            "      - [0xa9,0x14]",
+            "      - [0x8a,0x1a]",
+            "      - [0xaa,0x1a]",
+            "      - [0x8b,0x0a]",
+            "      - [0xab,0x0a]",
+            "      - [0x8c,0x14]",
+            "      - [0xac,0x08]",
+            "      - [0x8d,0x17]",
+            "      - [0xad,0x07]",
+            "      - [0x8e,0x16]",
+            "      - [0xae,0x06]",
+            "      - [0x8f,0x1B]",
+            "      - [0xaf,0x07]",
+            "      - [0x90,0x04]",
+            "      - [0xb0,0x04]",
+            "      - [0x91,0x0a]",
+            "      - [0xb1,0x0a]",
+            "      - [0x92,0x16]",
+            "      - [0xb2,0x15]",
+            "      - [0xff,0x00]",
+            "      - [0x11,0x00]",
+            "      - [0x29,0x00]"
+        ],
+        touch: { platform: "gt911", i2c_id: "bus_a", interrupt_pin: "3", reset_pin: "GPIO38" }
+    },
+    guition_esp32_jc8048w550: {
+        name: "Guition 5.0\" IPS 800x480 (Untested)",
+        displayPlatform: "rpi_dpi_rgb",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "GPIO19", scl: "GPIO20" }
+        },
+        backlight: { platform: "ledc", pin: "2", frequency: "1220Hz" },
+        display_config: [
+            "  - platform: rpi_dpi_rgb",
+            "    id: my_display",
+            "    color_order: RGB",
+            "    invert_colors: True",
+            "    update_interval: never",
+            "    auto_clear_enabled: false",
+            "    dimensions:",
+            "      width: 800",
+            "      height: 480",
+            "    de_pin: GPIO40",
+            "    hsync_pin: GPIO39",
+            "    vsync_pin: GPIO41",
+            "    pclk_pin: GPIO42",
+            "    pclk_frequency: 16MHz",
+            "    data_pins:",
+            "      red: [45, 48, 47, 21, 14]",
+            "      green: [5, 6, 7, 15, 16, 4]",
+            "      blue: [8, 3, 46, 9, 1]"
+        ],
+        touch: { platform: "gt911", i2c_id: "bus_a", address: "0x5D", update_interval: "16ms" }
+    },
+    lilygo_tdisplays3: {
+        name: "LilyGo T-Display S3 (Untested)",
+        displayPlatform: "ili9xxx",
+        features: { psram: true, buzzer: false, buttons: true, lcd: true },
+        pins: {
+            i2c: { sda: "17", scl: "18" },
+            buttons: { left: "GPIO0", right: "GPIO14" }
+        },
+        external_components: [
+            "  - source: github://clydebarrow/esphome@i8080",
+            "    components: [ i80, io_bus, ili9xxx, spi ]"
+        ],
+        extra_components: [
+            "i80:",
+            "  dc_pin: 7",
+            "  wr_pin: 8",
+            "  rd_pin: 9",
+            "  data_pins: [39, 40, 41, 42, 45, 46, 47, 48]"
+        ],
+        backlight: { platform: "ledc", pin: "GPIO38", frequency: "2000Hz" },
+        display_config: [
+            "  - platform: ili9xxx",
+            "    id: my_display",
+            "    rotation: 270",
+            "    bus_type: i80",
+            "    cs_pin: 6",
+            "    reset_pin: 5",
+            "    model: st7789v",
+            "    data_rate: 2MHz",
+            "    dimensions:",
+            "      height: 320",
+            "      width: 170",
+            "      offset_width: 35",
+            "      offset_height: 0",
+            "    color_order: bgr",
+            "    invert_colors: true",
+            "    auto_clear_enabled: false",
+            "    update_interval: never"
+        ],
+
+    },
+    waveshare_esp32_s3_touch_lcd_4_3: {
+        name: "Waveshare 4.3\" 800x480 (Untested)",
+        displayPlatform: "rpi_dpi_rgb",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "8", scl: "9" }
+        },
+        external_components: [
+            "  - source: github://oliverbeckhoff/esphome-ch422g@master"
+        ],
+        extra_components: [
+            "ch422g:"
+        ],
+        display_config: [
+            "  - platform: rpi_dpi_rgb",
+            "    id: my_display",
+            "    update_interval: never",
+            "    auto_clear_enabled: false",
+            "    color_order: RGB",
+            "    pclk_frequency: 16MHz",
+            "    dimensions:",
+            "      width: 800",
+            "      height: 480",
+            "    reset_pin:",
+            "      ch422g:",
+            "      number: 3",
+            "    enable_pin:",
+            "      ch422g:",
+            "      number: 2",
+            "    de_pin: 5",
+            "    hsync_pin: 46",
+            "    vsync_pin: 3",
+            "    pclk_pin: 7",
+            "    hsync_back_porch: 30",
+            "    hsync_front_porch: 210",
+            "    hsync_pulse_width: 30",
+            "    vsync_back_porch: 4",
+            "    vsync_front_porch: 4",
+            "    vsync_pulse_width: 4",
+            "    data_pins:",
+            "      red: [1, 2, 42, 41, 40]",
+            "      blue: [14, 38, 18, 17, 10]",
+            "      green: [39, 0, 45, 48, 47, 21]"
+        ],
+        touch: { platform: "gt911", i2c_id: "bus_a", interrupt_pin: "4", reset_pin: { ch422g: "", number: 1 } }
+    },
+    waveshare_esp32_s3_touch_lcd_2_8c: {
+        name: "Waveshare 2.8\" Round 480x480 (Untested)",
+        displayPlatform: "st7701s",
+        features: { psram: true, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "15", scl: "7" }
+        },
+        external_components: ["  # PCA9554 required for this device"],
+        extra_components: [
+            "pca9554:",
+            "  - id: p_c_a",
+            "    address: 0x20",
+            "    i2c_id: bus_a"
+        ],
+        backlight: { platform: "ledc", pin: "GPIO06", frequency: "2000Hz" },
+        extra_spi: [
+            "  - id: spi_lcd",
+            "    clk_pin: GPIO02",
+            "    mosi_pin: GPIO01",
+            "    interface: spi3"
+        ],
+        display_config: [
+            "  - platform: st7701s",
+            "    id: my_display",
+            "    spi_id: spi_lcd",
+            "    spi_mode: MODE1",
+            "    color_order: bgr",
+            "    auto_clear_enabled: false",
+            "    dimensions:",
+            "      width: 480",
+            "      height: 480",
+            "    cs_pin:",
+            "      pca9554: p_c_a",
+            "      number: 2",
+            "    reset_pin:",
+            "      pca9554: p_c_a",
+            "      number: 0",
+            "    de_pin: GPIO40",
+            "    hsync_pin: GPIO38",
+            "    vsync_pin: GPIO39",
+            "    pclk_pin: GPIO41",
+            "    init_sequence:",
+            "      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x13 ]",
+            "      - [ 0xEF, 0x08 ]",
+            "      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x10 ]",
+            "      - [ 0xC0, 0x3B, 0x00 ]",
+            "      - [ 0xC1, 0x10, 0x0C ]",
+            "      - [ 0xC2, 0x07, 0x0A ]",
+            "      - [ 0xC7, 0x00 ]",
+            "      - [ 0xCC, 0x10 ]",
+            "      - [ 0xCD, 0x08 ]",
+            "      - [ 0xB0, 0x05, 0x12, 0x98, 0x0E, 0x0F, 0x07, 0x07, 0x09, 0x09, 0x23, 0x05, 0x52, 0x0F, 0x67, 0x2C, 0x11 ]",
+            "      - [ 0xB1, 0x0B, 0x11, 0x97, 0x0C, 0x12, 0x06, 0x06, 0x08, 0x08, 0x22, 0x03, 0x51, 0x11, 0x66, 0x2B, 0x0F ]",
+            "      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x11 ]",
+            "      - [ 0xB0, 0x5D ]",
+            "      - [ 0xB1, 0x3E ]",
+            "      - [ 0xB2, 0x81 ]",
+            "      - [ 0xB3, 0x80 ]",
+            "      - [ 0xB5, 0x4E ]",
+            "      - [ 0xB7, 0x85 ]",
+            "      - [ 0xB8, 0x20 ]",
+            "      - [ 0xC1, 0x78 ]",
+            "      - [ 0xC2, 0x78 ]",
+            "      - [ 0xD0, 0x88 ]",
+            "      - [ 0xE0, 0x00, 0x00, 0x02 ]",
+            "      - [ 0xE1, 0x06, 0x30, 0x08, 0x30, 0x05, 0x30, 0x07, 0x30, 0x00, 0x33, 0x33 ]",
+            "      - [ 0xE2, 0x11, 0x11, 0x33, 0x33, 0xF4, 0x00, 0x00, 0x00, 0xF4, 0x00, 0x00, 0x00 ]",
+            "      - [ 0xE3, 0x00, 0x00, 0x11, 0x11 ]",
+            "      - [ 0xE4, 0x44, 0x44 ]",
+            "      - [ 0xE5, 0x0D, 0xF5, 0x30, 0xF0, 0x0F, 0xF7, 0x30, 0xF0, 0x09, 0xF1, 0x30, 0xF0, 0x0B, 0xF3, 0x30, 0xF0 ]",
+            "      - [ 0xE6, 0x00, 0x00, 0x11, 0x11 ]",
+            "      - [ 0xE7, 0x44, 0x44 ]",
+            "      - [ 0xE8, 0x0C, 0xF4, 0x30, 0xF0, 0x0E, 0xF6, 0x30, 0xF0, 0x08, 0xF0, 0x30, 0xF0, 0x0A, 0xF2, 0x30, 0xF0 ]",
+            "      - [ 0xE9, 0x36, 0x01 ]",
+            "      - [ 0xEB, 0x00, 0x01, 0xE4, 0xE4, 0x44, 0x88, 0x40 ]",
+            "      - [ 0xED, 0xFF, 0x10, 0xAF, 0x76, 0x54, 0x2B, 0xCF, 0xFF, 0xFF, 0xFC, 0xB2, 0x45, 0x67, 0xFA, 0x01, 0xFF ]",
+            "      - [ 0xEF, 0x08, 0x08, 0x08, 0x45, 0x3F, 0x54 ]",
+            "      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x00 ]",
+            "      - delay 120ms",
+            "      - [ 0x11 ]",
+            "      - delay 120ms",
+            "      - [ 0x3A, 0x66 ]",
+            "      - [ 0x36, 0x00 ]",
+            "      - [ 0x35, 0x00 ]",
+            "      - [ 0x20 ]",
+            "      - delay 120ms",
+            "      - [ 0x29 ]"
+        ],
+        touch: {
+            platform: "gt911",
+            i2c_id: "bus_a",
+            interrupt_pin: "GPIO16",
+            reset_pin: { pca9554: "p_c_a", number: 1 }
+        }
+    },
+    sunton_esp32_2432s028: {
+        name: "Sunton 2.8\" 240x320 (Untested)",
+        displayPlatform: "ili9xxx",
+        features: { psram: false, buzzer: false, buttons: false, lcd: true },
+        pins: {
+            i2c: { sda: "27", scl: "22" }
+        },
+        backlight: { platform: "ledc", pin: "21" },
+        extra_spi: [
+            "  - id: tft",
+            "    clk_pin: 14",
+            "    mosi_pin: 13",
+            "    miso_pin: 12",
+            "  - id: touch",
+            "    clk_pin: 25",
+            "    mosi_pin: 32",
+            "    miso_pin: 39"
+        ],
+        display_config: [
+            "  - platform: ili9xxx",
+            "    id: my_display",
+            "    model: TFT 2.4R",
+            "    spi_id: tft",
+            "    cs_pin: 15",
+            "    dc_pin: 2",
+            "    invert_colors: true",
+            "    color_palette: 8BIT",
+            "    update_interval: never",
+            "    auto_clear_enabled: false",
+            "    transform:",
+            "      swap_xy: true",
+            "      mirror_x: false",
+            "    dimensions:",
+            "      height: 320",
+            "      width: 240"
+        ],
+        touch: {
+            platform: "xpt2046",
+            spi_id: "touch",
+            cs_pin: "33",
+            interrupt_pin: "36",
+            calibration: { x_min: 280, x_max: 3860, y_min: 340, y_max: 3860 }
         }
     }
 };
+
+// ============================================================================
+// HARDWARE SECTION GENERATORS
+// ============================================================================
+
+function generateTouchscreenSection(profile) {
+    if (!profile.touch) return []; // E-paper usually has no touch or handled differently
+
+    const t = profile.touch;
+    const lines = ["touchscreen:"];
+    lines.push(`  - platform: ${t.platform}`);
+    lines.push(`    id: my_touchscreen`);
+    lines.push(`    display: my_display`); // Assumes display ID is my_display (LCDs)
+
+    if (t.i2c_id) lines.push(`    i2c_id: ${t.i2c_id}`);
+    if (t.spi_id) lines.push(`    spi_id: ${t.spi_id}`);
+
+    // Explicit addresses or update intervals
+    if (t.address) lines.push(`    address: ${t.address}`);
+    if (t.update_interval) lines.push(`    update_interval: ${t.update_interval}`);
+
+    // Pin mappings (some might be objects for IO extenders)
+    const addPin = (key, val) => {
+        if (!val) return;
+        if (typeof val === 'string' || typeof val === 'number') {
+            lines.push(`    ${key}: ${val}`);
+        } else {
+            lines.push(`    ${key}:`);
+            Object.entries(val).forEach(([k, v]) => lines.push(`      ${k}: ${v}`));
+        }
+    };
+
+    addPin("interrupt_pin", t.interrupt_pin);
+    addPin("reset_pin", t.reset_pin);
+    addPin("cs_pin", t.cs_pin);
+
+    // Calc/Transform
+    const transform = [];
+    if (t.mirror_x) transform.push("mirror_x: true");
+    if (t.mirror_y) transform.push("mirror_y: true");
+    if (t.swap_xy) transform.push("swap_xy: true");
+
+    if (transform.length > 0) {
+        lines.push("    transform:");
+        transform.forEach(l => lines.push(`      ${l}`));
+    }
+
+    if (t.calibration) {
+        lines.push("    calibration:");
+        Object.entries(t.calibration).forEach(([k, v]) => lines.push(`      ${k}: ${v}`));
+    }
+
+    lines.push("");
+    return lines;
+}
+
+function generateBacklightSection(profile) {
+    const lines = [];
+    if (!profile.backlight) return lines;
+
+    const bl = profile.backlight;
+
+    // Output component for the backlight pin
+    if (bl.platform === "ledc" || bl.platform === "gpio" || bl.platform === "switch") {
+        if (bl.platform === "switch") {
+            lines.push("switch:");
+            lines.push("  - platform: gpio"); // Usually gpio switch for on/off backlights
+            lines.push("    id: lcdbacklight");
+            lines.push("    name: lcdbacklight");
+            // Handle complex pin objects (e.g. attached to IO expander)
+            if (typeof bl.pin === 'object') {
+                lines.push("    pin:");
+                Object.entries(bl.pin).forEach(([k, v]) => {
+                    if (typeof v === 'object') {
+                        lines.push(`      ${k}:`);
+                        Object.entries(v).forEach(([sk, sv]) => lines.push(`        ${sk}: ${sv}`));
+                    } else {
+                        lines.push(`      ${k}: ${v}`);
+                    }
+                });
+            } else {
+                lines.push(`    pin: ${bl.pin}`);
+            }
+            lines.push("    restore_mode: ALWAYS_ON");
+            lines.push("");
+        } else {
+            lines.push("output:");
+            lines.push(`  - platform: ${bl.platform}`);
+            lines.push(`    id: gpio_backlight_pwm`);
+            lines.push(`    pin: ${bl.pin}`);
+            if (bl.frequency) lines.push(`    frequency: ${bl.frequency}`);
+            lines.push("");
+        }
+    }
+
+    // Light component to control it
+    lines.push("light:");
+    lines.push("  - platform: monochromatic");
+    lines.push("    name: Display Backlight");
+    lines.push("    id: display_backlight");
+    lines.push("    restore_mode: ALWAYS_ON");
+
+    if (bl.platform === "switch") {
+        // Fake output for switch-based backlights (Waveshare 7" style)
+        lines.push("    output: fake_backlight_output");
+        lines.push("    default_transition_length: 0s");
+        lines.push("");
+        lines.push("output:");
+        lines.push("  - platform: template");
+        lines.push("    id: fake_backlight_output");
+        lines.push("    type: float");
+        lines.push("    write_action:");
+        lines.push("      - if:");
+        lines.push("          condition:");
+        lines.push("            lambda: 'return state > 0.0;'");
+        lines.push("          then:");
+        lines.push("            - switch.turn_on: lcdbacklight");
+        lines.push("          else:");
+        lines.push("            - switch.turn_off: lcdbacklight");
+    } else {
+        lines.push("    output: gpio_backlight_pwm");
+    }
+    lines.push("");
+    return lines;
+}
+
+function generateExtraComponents(profile) {
+    const lines = [];
+    if (profile.extra_components && Array.isArray(profile.extra_components)) {
+        lines.push(...profile.extra_components);
+        lines.push("");
+    }
+    if (profile.extra_spi && Array.isArray(profile.extra_spi)) {
+        lines.push("spi:");
+        lines.push(...profile.extra_spi);
+        lines.push("");
+    }
+    return lines;
+}
 
 // ============================================================================
 // HARDWARE SECTION GENERATORS
@@ -175,21 +873,65 @@ function generateGlobalsSection(defaultRefreshS = 900, quoteWidgets = []) {
  */
 function generateI2CSection(profile, busId = "bus_a") {
     if (!profile.pins.i2c) return [];
-    return [
+
+    let scan = "true";
+    let frequency = "";
+
+    // Check main profile i2c_config
+    if (profile.i2c_config) {
+        if (profile.i2c_config.scan === false) scan = "false";
+        if (profile.i2c_config.frequency) frequency = `  frequency: ${profile.i2c_config.frequency}`;
+    }
+
+    const lines = [
         "i2c:",
         `  sda: ${profile.pins.i2c.sda}`,
         `  scl: ${profile.pins.i2c.scl}`,
-        "  scan: true",
-        `  id: ${busId}`,
-        ""
+        `  scan: ${scan}`,
+        `  id: ${busId}`
     ];
+    if (frequency) lines.push(frequency);
+    lines.push("");
+    return lines;
+}
+
+function generateDisplaySection(profile) {
+    const lines = [];
+    lines.push("display:");
+
+    // 1. Raw Display Config (New method for LCDs)
+    if (profile.display_config && Array.isArray(profile.display_config)) {
+        lines.push(...profile.display_config);
+        lines.push("");
+        return lines;
+    }
+
+    // 2. Legacy E-Paper Logic
+    const platform = profile.displayPlatform || "waveshare_epaper";
+    const model = profile.displayModel || "7.50inv2";
+
+    lines.push(`  - platform: ${platform}`);
+    lines.push(`    cs_pin: ${profile.pins.display.cs}`);
+    lines.push(`    dc_pin: ${profile.pins.display.dc}`);
+    lines.push(`    reset_pin: ${profile.pins.display.reset}`);
+    lines.push(`    busy_pin: ${profile.pins.display.busy}`);
+    lines.push(`    model: ${model}`);
+    lines.push(`    id: epaper_display`);
+    lines.push(`    update_interval: never`);
+    if (platform === "waveshare_epaper") {
+        lines.push(`    full_update_every: 30`);
+    }
+    lines.push("");
+    return lines;
 }
 
 /**
  * Generates AXP2101 PMIC section (Critical for PhotoPainter)
  */
 function generateAXP2101Section(profile) {
-    if (!profile.features.axp2101) return [];
+    // If feature not present or handled manually (e.g. PhotoPainter), skip component generation
+    if (!profile.features.axp2101 || profile.features.manual_pmic) return [];
+
     return [
         "axp2101:",
         "  i2c_id: bus_a",
@@ -222,6 +964,10 @@ function generateAXP2101Section(profile) {
  * Generates SPI section
  */
 function generateSPISection(profile) {
+    if (!profile.pins.spi) return [];
+    // If specific ID required or custom config, likely handled in extra_spi
+    if (profile.pins.spi.id) return [];
+
     return [
         "spi:",
         `  clk_pin: ${profile.pins.spi.clk}`,
@@ -279,6 +1025,28 @@ function generateRTTTLSection(profile) {
     ];
 }
 
+function generateAudioSection(profile) {
+    if (!profile.audio) return [];
+    const lines = [];
+    if (profile.audio.i2s_audio) {
+        lines.push("i2s_audio:");
+        lines.push(`  i2s_lrclk_pin: ${profile.audio.i2s_audio.i2s_lrclk_pin}`);
+        lines.push(`  i2s_bclk_pin: ${profile.audio.i2s_audio.i2s_bclk_pin}`);
+        if (profile.audio.i2s_audio.i2s_mclk_pin) lines.push(`  i2s_mclk_pin: ${profile.audio.i2s_audio.i2s_mclk_pin}`);
+        lines.push("");
+    }
+    if (profile.audio.speaker) {
+        lines.push("speaker:");
+        lines.push(`  - platform: ${profile.audio.speaker.platform}`);
+        lines.push(`    id: my_speaker`);
+        if (profile.audio.speaker.dac_type) lines.push(`    dac_type: ${profile.audio.speaker.dac_type}`);
+        if (profile.audio.speaker.i2s_dout_pin) lines.push(`    i2s_dout_pin: ${profile.audio.speaker.i2s_dout_pin}`);
+        if (profile.audio.speaker.mode) lines.push(`    mode: ${profile.audio.speaker.mode}`);
+        lines.push("");
+    }
+    return lines;
+}
+
 /**
  * Generates unified sensor section (device sensors + widget sensors)
  * @param {object} profile - Device profile
@@ -311,7 +1079,9 @@ function generateSensorSection(profile, widgetSensorLines = []) {
 
     // Battery voltage sensor
     // Skip if AXP2101 is present (it handles battery monitoring)
-    if (!profile.features.axp2101) {
+    // Skip if AXP2101 is present (it handles battery monitoring)
+    // ALSO SKIP if no battery configuration is defined (e.g. mains powered devices)
+    if (!profile.features.axp2101 && profile.battery && profile.pins && profile.pins.batteryAdc) {
         lines.push("  # Battery Voltage");
         lines.push("  - platform: adc");
         lines.push(`    pin: ${profile.pins.batteryAdc}`);
@@ -327,8 +1097,8 @@ function generateSensorSection(profile, widgetSensorLines = []) {
     }
 
     // Battery level template sensor
-    // Skip if AXP2101 is present
-    if (!profile.features.axp2101) {
+    // Skip if AXP2101 is present OR no battery config
+    if (!profile.features.axp2101 && profile.battery) {
         lines.push("  # Battery Level (calculated from voltage)");
         lines.push("  - platform: template");
         lines.push("    name: \"Battery Level\"");
@@ -520,6 +1290,174 @@ function generateSnippetLocally() {
     const pages = payload.pages || [];
     const pagesLocal = pages;
     const lines = [];
+
+    const model = getDeviceModel();
+    const profile = DEVICE_PROFILES[model] || DEVICE_PROFILES["reterminal_e1001"];
+
+    // Collect quote/rss widgets early for globals and interval generation
+    const quoteRssWidgetsEarly = [];
+    if (pages) {
+        for (const page of pages) {
+            if (page && Array.isArray(page.widgets)) {
+                for (const w of page.widgets) {
+                    if ((w.type || "").toLowerCase() === "quote_rss") {
+                        quoteRssWidgetsEarly.push(w);
+                    }
+                }
+            }
+        }
+    }
+
+    // --- HEADER ---
+    lines.push("# ============================================================================");
+    lines.push("# ESPHome YAML - Generated by ESPHome Designer");
+    lines.push("# ============================================================================");
+    lines.push(`# TARGET DEVICE: ${profile.name}`);
+
+    // Add brief device specs comment based on profile features
+    const feats = profile.features || {};
+    lines.push(`#         - Display Platform: ${profile.displayPlatform}`);
+    lines.push(`#         - PSRAM: ${feats.psram ? 'Yes' : 'No'}`);
+    lines.push(`#         - Battery: ${profile.battery ? 'Yes' : 'No'}`);
+    lines.push(`#         - Buttons: ${feats.buttons ? 'Yes' : 'No'}`);
+    lines.push(`#         - Buzzer: ${feats.buzzer ? 'Yes' : 'No'}`);
+    if (feats.audio) lines.push(`#         - Audio: Yes`);
+    lines.push("# ============================================================================");
+    lines.push("#");
+    lines.push("# SETUP INSTRUCTIONS:");
+    lines.push("#");
+    lines.push("# STEP 1: Copy the Material Design Icons font file");
+    lines.push("#         - From this repo: resources/fonts/materialdesignicons-webfont.ttf");
+    lines.push("#         - To ESPHome: /config/esphome/fonts/materialdesignicons-webfont.ttf");
+    lines.push("#         (Create the fonts folder if it doesn't exist)");
+    lines.push("#");
+    lines.push("# STEP 2: Create a new device in ESPHome");
+    lines.push("#         - Click \"New Device\"");
+    lines.push("#         - Name: your-device-name");
+    lines.push("#         - Select: ESP32-S3 (or appropriate for your board)");
+    lines.push("#");
+    lines.push("# STEP 3: Add the on_boot sequence");
+    if (getDeviceModel() === "esp32_s3_photopainter") {
+        lines.push("#         CRITICAL FOR PHOTOPAINTER: Use this exact on_boot sequence to prevent boot loops!");
+        lines.push("#         Paste this under 'esphome:' in your YAML:");
+        lines.push("#");
+        lines.push("#   on_boot:");
+        lines.push("#     priority: 800");
+        lines.push("#     then:");
+        lines.push("#       - lambda: |-");
+        lines.push("#           auto write_reg = [](uint8_t reg, uint8_t val) {");
+        lines.push("#             uint8_t data[2] = {reg, val};");
+        lines.push("#             id(bus_a)->write(0x34, data, 2);");
+        lines.push("#           };");
+        lines.push("#           write_reg(0x94, 0x1C); // ALDO3 3.3V");
+        lines.push("#           write_reg(0x95, 0x1C); // ALDO4 3.3V");
+        lines.push("#           write_reg(0x90, 0x1F); // Enable rails");
+        lines.push("#           ESP_LOGI(\"power\", \"AXP2101 Configured\");");
+        lines.push("#       - delay: 200ms");
+        lines.push("#       - component.update: epaper_display");
+        lines.push("#       - script.execute: manage_run_and_sleep");
+        lines.push("#");
+    } else {
+        lines.push("#         (See device documentation for specific on_boot requirements if any)");
+    }
+    lines.push("# STEP 4: Paste this ENTIRE snippet after the captive_portal: line");
+    lines.push("#");
+    lines.push("# ============================================================================");
+    lines.push("");
+
+    // Output device settings
+    lines.push("# ====================================");
+    lines.push("# Device Settings");
+    lines.push("# ====================================");
+    lines.push(`# Orientation: ${payload.orientation || 'landscape'}`);
+    lines.push(`# Dark Mode: ${payload.dark_mode ? 'enabled' : 'disabled'}`);
+    lines.push(`# Sleep Mode: ${payload.sleep_enabled ? 'enabled (' + payload.sleep_start_hour + 'h - ' + payload.sleep_end_hour + 'h)' : 'disabled'}`);
+    lines.push("# ====================================");
+    lines.push("");
+
+
+    // --- HARDWARE SECTIONS ---
+
+    lines.push(...generateGlobalsSection(900, quoteRssWidgetsEarly));
+    lines.push(...generatePSRAMSection(profile));
+
+    // HTTP Request (needed for online images/quotes)
+    lines.push("http_request:");
+    lines.push("  verify_ssl: false");
+    lines.push("  timeout: 20s");
+    lines.push("");
+
+    lines.push(...generateI2CSection(profile));
+    lines.push(...generateSPISection(profile));
+    lines.push(...generateExtraComponents(profile));
+    lines.push(...generateAXP2101Section(profile));
+    lines.push(...generateOutputSection(profile));
+    lines.push(...generateBacklightSection(profile));
+    lines.push(...generateRTTTLSection(profile));
+    lines.push(...generateAudioSection(profile));
+
+    // Display & Touch
+    lines.push(...generateTouchscreenSection(profile));
+
+    // Sensors & Inputs (Moved to bottom to allow widget sensor collection)
+    // lines.push(...generateSensorSection(profile));
+    // lines.push(...generateBinarySensorSection(profile, pages.length));
+
+    // Interval for Quotes (if any)
+    if (quoteRssWidgetsEarly.length > 0) {
+        lines.push("interval:");
+        for (const w of quoteRssWidgetsEarly) {
+            const p = w.props || {};
+            const feedUrl = p.feed_url || "https://www.brainyquote.com/link/quotebr.rss";
+            const refreshInterval = p.refresh_interval || "1h";
+            const quoteTextId = `quote_text_${w.id}`.replace(/-/g, "_");
+            const quoteAuthorId = `quote_author_${w.id}`.replace(/-/g, "_");
+            const showAuthor = p.show_author !== false;
+            // Encode feed URL for the proxy
+            const encodedFeedUrl = encodeURIComponent(feedUrl);
+
+            lines.push(`  # Quote widget: ${w.id}`);
+            lines.push(`  - interval: ${refreshInterval}`);
+            lines.push(`    startup_delay: 30s`);
+            lines.push(`    then:`);
+            lines.push(`      - if:`);
+            lines.push(`          condition:`);
+            lines.push(`            wifi.connected:`);
+            lines.push(`          then:`);
+            lines.push(`            - http_request.get:`);
+            lines.push(`                # Fetches from Home Assistant's RSS proxy endpoint`);
+            lines.push(`                url: "http://homeassistant.local:8123/api/reterminal_dashboard/rss_proxy?url=${encodedFeedUrl}&random=true"`);
+            lines.push(`                capture_response: true`);
+            lines.push(`                on_response:`);
+            lines.push(`                  - lambda: |-`);
+            lines.push(`                      if (response->status_code == 200) {`);
+            lines.push(`                        json::parse_json(body, [](JsonObject root) -> bool {`);
+            lines.push(`                          if (root["success"].as<bool>()) {`);
+            lines.push(`                            JsonObject quote = root["quote"];`);
+            lines.push(`                            std::string text = quote["quote"].as<std::string>();`);
+            lines.push(`                            std::string author = quote["author"].as<std::string>();`);
+            lines.push(`                            id(${quoteTextId}_global) = text;`);
+            if (showAuthor) {
+                lines.push(`                            id(${quoteAuthorId}_global) = author;`);
+            }
+            lines.push(`                            ESP_LOGI("quote", "Fetched: %s - %s", text.c_str(), author.c_str());`);
+            lines.push(`                          }`);
+            lines.push(`                          return true;`);
+            lines.push(`                        });`);
+            lines.push(`                        id(epaper_display).update();`);
+            lines.push(`                      } else {`);
+            lines.push(`                        ESP_LOGW("quote", "Failed to fetch quote, HTTP %d", response->status_code);`);
+            lines.push(`                      }`);
+            lines.push(`          else:`);
+            lines.push(`            - logger.log:`);
+            lines.push(`                level: WARN`);
+            lines.push(`                format: "Quote fetch skipped - WiFi not connected"`);
+        }
+        lines.push("");
+    }
+
+    // Fonts & Images Logic...
+    // (Rest of the function continues below)
 
     // Global offset for text widgets to match device rendering
     // Adjust this value if text appears misaligned on the e-ink display
@@ -734,113 +1672,7 @@ function generateSnippetLocally() {
     addFont("Roboto", 400, 14);
     addFont("Roboto", 400, 20);
 
-    // Get device model for header and profile lookup
-    const deviceModel = getDeviceModel();
-    const profile = DEVICE_PROFILES[deviceModel] || DEVICE_PROFILES.reterminal_e1001;
-
-    let deviceDisplayName = "reTerminal E1001 (Monochrome)";
-    if (deviceModel === "reterminal_e1002") {
-        deviceDisplayName = "reTerminal E1002 (6-Color)";
-    } else if (deviceModel === "trmnl") {
-        deviceDisplayName = "Official TRMNL (ESP32-C3)";
-    } else if (deviceModel === "esp32_s3_photopainter") {
-        deviceDisplayName = "Waveshare PhotoPainter (7-Color)";
-    }
-
-    lines.push("# ============================================================================");
-    lines.push("# ESPHome YAML - Generated by ESPHome Designer");
-    lines.push("# ============================================================================");
-    lines.push(`# TARGET DEVICE: ${deviceDisplayName}`);
-
-    // Add device-specific specs
-    if (deviceModel === "reterminal_e1002") {
-        lines.push("#         - Display: 7.5\" Seeed e-Paper (800x480, 6-Color)");
-        lines.push("#         - Battery: Yes (LiPo with ADC on GPIO1)");
-        lines.push("#         - Buttons: Yes (3 physical buttons)");
-        lines.push("#         - Buzzer: Yes (GPIO45)");
-        lines.push("#         - Onboard Sensors: Temperature & Humidity (SHT4x)");
-        lines.push("#         - NOTE: Requires ESPHome 2025.11.0+");
-    } else if (deviceModel === "trmnl") {
-        lines.push("#         - Display: 7.5\" Waveshare e-Paper (800x480, Monochrome)");
-        lines.push("#         - Battery: Yes (LiPo with ADC on GPIO0)");
-        lines.push("#         - Buttons: None");
-        lines.push("#         - Buzzer: None");
-    } else if (deviceModel === "esp32_s3_photopainter") {
-        lines.push("#         - Display: 7.3\" Waveshare e-Paper (800x480, 7-Color)");
-        lines.push("#         - Battery: Yes (Managed by AXP2101)");
-        lines.push("#         - Buttons: Yes (Boot/Key)");
-        lines.push("#         - Audio: Speaker (ES8311 - Pending media_player support)");
-        lines.push("#         - PMIC: AXP2101 (Power Management)");
-    } else {
-        lines.push("#         - Display: 7.5\" Waveshare e-Paper (800x480, Monochrome)");
-        lines.push("#         - Battery: Yes (LiPo with ADC on GPIO1)");
-        lines.push("#         - Buttons: Yes (3 physical buttons)");
-        lines.push("#         - Buzzer: Yes (GPIO45)");
-        lines.push("#         - Onboard Sensors: Temperature & Humidity (SHT4x)");
-    }
-    lines.push("# ============================================================================");
-    lines.push("#");
-    lines.push("# SETUP INSTRUCTIONS:");
-    lines.push("#");
-    lines.push("# STEP 1: Copy the Material Design Icons font file");
-    lines.push("#         - From this repo: font_ttf/materialdesignicons-webfont.ttf");
-    lines.push("#         - To ESPHome: /config/esphome/fonts/materialdesignicons-webfont.ttf");
-    lines.push("#         (Create the fonts folder if it doesn't exist)");
-    lines.push("#");
-    lines.push("# STEP 2: Create a new device in ESPHome");
-    lines.push("#         - Click \"New Device\"");
-    lines.push("#         - Name: reterminal (or your choice)");
-    if (deviceModel === "trmnl") {
-        lines.push("#         - Select: ESP32-C3");
-    } else {
-        lines.push("#         - Select: ESP32-S3");
-    }
-    lines.push("#         - ESPHome will auto-generate a basic config");
-    lines.push("#");
-
-    // Add external_components (Required for AXP2101 on PhotoPainter)
-    if (deviceModel === "esp32_s3_photopainter") {
-        lines.push("# STEP 2.5: Add external_components for AXP2101");
-        lines.push("#           (Paste this after esphome: section)");
-        lines.push("#");
-        lines.push("#         external_components:");
-        lines.push("#           - source: github://lewisxhe/esphome-axp2101");
-        lines.push("#");
-    }
-
-    lines.push("# STEP 3: Add this on_boot section to your esphome: section:");
-    lines.push("#");
-    lines.push("#         esphome:");
-    lines.push("#           name: your-device-name");
-    lines.push("#           compile_process_limit: 1");
-    lines.push("#           on_boot:");
-    lines.push("#             priority: 600");
-    lines.push("#             then:");
-    if (deviceModel !== "trmnl" && profile.pins.batteryEnable) {
-        lines.push("#               - output.turn_on: bsp_battery_enable");
-    }
-    lines.push("#               - delay: 2s");
-    lines.push("#               - component.update: epaper_display");
-    lines.push("#               - script.execute: manage_run_and_sleep");
-    lines.push("#");
-    lines.push("# STEP 4: Paste this ENTIRE snippet after the captive_portal: line");
-    lines.push("#         All hardware configuration (sensors, buttons, etc.) is included.");
-    lines.push("#         No need to copy from templates - this is self-contained!");
-    lines.push("#");
-    lines.push("# ============================================================================");
-    lines.push("");
-
-    // Output device settings
-    lines.push("# ====================================");
-    lines.push("# Device Settings (from editor)");
-    lines.push("# ====================================");
-    lines.push(`# Orientation: ${payload.orientation || 'landscape'}`);
-    lines.push(`# Dark Mode: ${payload.dark_mode ? 'enabled' : 'disabled'}`);
-    lines.push(`# Sleep Mode: ${payload.sleep_enabled ? 'enabled (' + payload.sleep_start_hour + 'h - ' + payload.sleep_end_hour + 'h)' : 'disabled'}`);
-    lines.push(`# Manual Refresh Only: ${payload.manual_refresh_only ? 'enabled' : 'disabled'}`);
-    lines.push(`# Deep Sleep: ${payload.deep_sleep_enabled ? 'enabled (' + (payload.deep_sleep_interval || 600) + 's interval)' : 'disabled'}`);
-    lines.push("# ====================================");
-    lines.push("");
+    // (Header and Device Settings moved to top)
 
     // Generate Font Section
     const fontLines = [];
@@ -1008,10 +1840,9 @@ function generateSnippetLocally() {
         lines.push("");
     }
 
-    // Collect all puppet, online_image, graph, and quote_rss widgets
     const onlineImageWidgets = [];
     const graphWidgets = [];
-    const quoteRssWidgetsEarly = [];  // Collected early for globals section
+    // quoteRssWidgetsEarly collected at top of function
     for (const page of pagesLocal) {
         if (!page || !Array.isArray(page.widgets)) continue;
         for (const w of page.widgets) {
@@ -1020,8 +1851,6 @@ function generateSnippetLocally() {
                 onlineImageWidgets.push(w);
             } else if (t === "graph") {
                 graphWidgets.push(w);
-            } else if (t === "quote_rss") {
-                quoteRssWidgetsEarly.push(w);
             }
         }
     }
@@ -1230,105 +2059,8 @@ function generateSnippetLocally() {
     // Note: profile already defined at top of function
     const numPages = pagesLocal.length || 5;
 
-    // Generate globals section (required for navigation, refresh, and quote storage)
-    lines.push(...generateGlobalsSection(900, quoteRssWidgetsEarly));
-
-    // Generate external_components section (Critical for PhotoPainter AXP2101)
-    if (deviceModel === "esp32_s3_photopainter") {
-        // Commented out to avoid duplicate key error if user already has it in base config
-        // lines.push("external_components:");
-        // lines.push("  - source: github://lewisxhe/esphome-axp2101");
-        // lines.push("");
-        lines.push("# Note: waveshare_photopainter requires the 'esphome-axp2101' external component.");
-        lines.push("# Ensure these lines are in your main configuration:");
-        lines.push("# external_components:");
-        lines.push("#   - source: github://lewisxhe/esphome-axp2101@master");
-        lines.push("");
-    }
-
-    // Generate PSRAM section (ESP32-S3 devices only)
-    lines.push(...generatePSRAMSection(profile));
-
-    // Generate http_request section (required for online images and quote fetching)
-    lines.push("http_request:");
-    lines.push("  verify_ssl: false");
-    lines.push("  timeout: 20s");
-    lines.push("");
-
-    // Generate interval section for quote widget RSS fetching
-    if (quoteRssWidgetsEarly.length > 0) {
-        lines.push("interval:");
-        for (const w of quoteRssWidgetsEarly) {
-            const p = w.props || {};
-            const feedUrl = p.feed_url || "https://www.brainyquote.com/link/quotebr.rss";
-            const refreshInterval = p.refresh_interval || "1h";
-            const quoteTextId = `quote_text_${w.id}`.replace(/-/g, "_");
-            const quoteAuthorId = `quote_author_${w.id}`.replace(/-/g, "_");
-            const showAuthor = p.show_author !== false;
-            // Encode feed URL for the proxy
-            const encodedFeedUrl = encodeURIComponent(feedUrl);
-
-            lines.push(`  # Quote widget: ${w.id}`);
-            lines.push(`  - interval: ${refreshInterval}`);
-            lines.push(`    startup_delay: 30s`);
-            lines.push(`    then:`);
-            lines.push(`      - if:`);
-            lines.push(`          condition:`);
-            lines.push(`            wifi.connected:`);
-            lines.push(`          then:`);
-            lines.push(`            - http_request.get:`);
-            lines.push(`                # Fetches from Home Assistant's RSS proxy endpoint`);
-            lines.push(`                # Uses homeassistant.local by default - change if your HA uses a different hostname`);
-            lines.push(`                url: "http://homeassistant.local:8123/api/reterminal_dashboard/rss_proxy?url=${encodedFeedUrl}&random=true"`);
-            lines.push(`                capture_response: true`);
-            lines.push(`                on_response:`);
-            lines.push(`                  - lambda: |-`);
-            lines.push(`                      if (response->status_code == 200) {`);
-            lines.push(`                        json::parse_json(body, [](JsonObject root) -> bool {`);
-            lines.push(`                          if (root["success"].as<bool>()) {`);
-            lines.push(`                            JsonObject quote = root["quote"];`);
-            lines.push(`                            std::string text = quote["quote"].as<std::string>();`);
-            lines.push(`                            std::string author = quote["author"].as<std::string>();`);
-            lines.push(`                            id(${quoteTextId}_global) = text;`);
-            if (showAuthor) {
-                lines.push(`                            id(${quoteAuthorId}_global) = author;`);
-            }
-            lines.push(`                            ESP_LOGI("quote", "Fetched: %s - %s", text.c_str(), author.c_str());`);
-            lines.push(`                          }`);
-            lines.push(`                          return true;`);
-            lines.push(`                        });`);
-            lines.push(`                        id(epaper_display).update();`);
-            lines.push(`                      } else {`);
-            lines.push(`                        ESP_LOGW("quote", "Failed to fetch quote, HTTP %d", response->status_code);`);
-            lines.push(`                      }`);
-            lines.push(`          else:`);
-            lines.push(`            - logger.log:`);
-            lines.push(`                level: WARN`);
-            lines.push(`                format: "Quote fetch skipped - WiFi not connected"`);
-        }
-        lines.push("");
-    }
-
-    // Generate time component (always needed for datetime widgets and refresh logic)
-    lines.push("time:");
-    lines.push("  - platform: homeassistant");
-    lines.push("    id: ha_time");
-    lines.push("");
-
-    // Generate I2C section
-    lines.push(...generateI2CSection(profile));
-
-    // Generate SPI section
-    lines.push(...generateSPISection(profile));
-
-    // Generate AXP2101 section (PhotoPainter)
-    lines.push(...generateAXP2101Section(profile));
-
-    // Generate output section (battery enable, buzzer)
-    lines.push(...generateOutputSection(profile));
-
-    // Generate RTTTL buzzer section
-    lines.push(...generateRTTTLSection(profile));
+    // (Redundant hardware generation removed - handled at top)
+    // Keep sensor generation below logic
 
     // ========================================================================
     // SENSOR SECTION (Device + Widget sensors unified)
@@ -1389,7 +2121,8 @@ function generateSnippetLocally() {
         const entityId = (w.entity_id || "").trim();
         const p = w.props || {};
         // Skip if no entity, already added (by graph or other sensor_text), local sensor, or not a sensor.* entity
-        if (!entityId || addedNumericSensors.has(entityId) || p.is_local_sensor) continue;
+        // Also skip if marked as text sensor (handled in text_sensor section)
+        if (!entityId || addedNumericSensors.has(entityId) || p.is_local_sensor || p.is_text_sensor) continue;
         if (!entityId.startsWith("sensor.")) continue; // weather.* and text_sensor.* handled elsewhere
 
         addedNumericSensors.add(entityId);
@@ -1477,6 +2210,10 @@ function generateSnippetLocally() {
             if (t === "sensor_text" && entityId.startsWith("text_sensor.")) {
                 textSensorEntitiesUsed.add(entityId);
             }
+            // Also add sensor.* entities marked as text sensors to the text_sensor block
+            if (t === "sensor_text" && entityId.startsWith("sensor.") && p.is_text_sensor) {
+                textSensorEntitiesUsed.add(entityId);
+            }
         }
     }
 
@@ -1525,11 +2262,12 @@ function generateSnippetLocally() {
             lines.push("");
         }
 
-        // Add text_sensor entity sensors (for sensor_text widgets using text_sensor.* entities)
+        // Add text_sensor entity sensors (for sensor_text widgets using text_sensor.* or sensor.* entities marked as text sensors)
         if (textSensorEntitiesUsed.size > 0) {
             lines.push("  # Text Sensor Entity Sensors (from Home Assistant)");
             for (const entityId of textSensorEntitiesUsed) {
-                const safeId = entityId.replace(/^text_sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
+                // Handle both text_sensor.* and sensor.* prefixes
+                const safeId = entityId.replace(/^(text_sensor|sensor)\./, "").replace(/\./g, "_").replace(/-/g, "_");
                 lines.push(`  - platform: homeassistant`);
                 lines.push(`    id: ${safeId}`);
                 lines.push(`    entity_id: ${entityId}`);
@@ -1554,18 +2292,20 @@ function generateSnippetLocally() {
             lines.push("  # Calendar Widget Sensors (from Home Assistant)");
             for (const w of calendarWidgets) {
                 const entityId = (w.props && w.props.entity_id) || "sensor.esp_calendar_data";
+                // Sanitize widget ID by replacing hyphens with underscores (ESPHome requirement)
+                const safeWidgetId = w.id.replace(/-/g, "_");
                 lines.push(`  - platform: homeassistant`);
-                lines.push(`    id: calendar_json_${w.id}`);
+                lines.push(`    id: calendar_json_${safeWidgetId}`);
                 lines.push(`    entity_id: ${entityId}`);
                 lines.push(`    attribute: entries`);
                 lines.push(`    internal: true`);
                 lines.push(`  - platform: homeassistant`);
-                lines.push(`    id: todays_day_name_${w.id}`);
+                lines.push(`    id: todays_day_name_${safeWidgetId}`);
                 lines.push(`    entity_id: ${entityId}`);
                 lines.push(`    attribute: todays_day_name`);
                 lines.push(`    internal: true`);
                 lines.push(`  - platform: homeassistant`);
-                lines.push(`    id: todays_date_month_year_${w.id}`);
+                lines.push(`    id: todays_date_month_year_${safeWidgetId}`);
                 lines.push(`    entity_id: ${entityId}`);
                 lines.push(`    attribute: todays_date_month_year`);
                 lines.push(`    internal: true`);
@@ -1634,64 +2374,9 @@ function generateSnippetLocally() {
     lines.push(scriptSection);
     lines.push("");
 
-    lines.push("display:");
+    lines.push(...generateDisplaySection(profile));
 
     const useLVGL = window.hasLVGLWidgets && window.hasLVGLWidgets(pagesLocal);
-
-    // deviceModel already defined above for hardware profile lookup
-    if (deviceModel === "reterminal_e1002") {
-        // E1002 color e-paper display configuration (requires ESPHome 2025.11.0+)
-        lines.push("  # Device: reTerminal E1002 (6-Color E-Paper)");
-        lines.push("  - platform: epaper_spi");
-        lines.push("    id: epaper_display");
-        lines.push("    model: Seeed-reTerminal-E1002");
-        lines.push("    update_interval: never");
-    } else if (deviceModel === "trmnl") {
-        // Official TRMNL (ESP32-C3) configuration
-        lines.push("  # Device: Official TRMNL (ESP32-C3)");
-        lines.push("  - platform: waveshare_epaper");
-        lines.push("    id: epaper_display");
-        lines.push("    model: 7.50inv2");
-        lines.push("    cs_pin: GPIO6");
-        lines.push("    dc_pin: GPIO5");
-        lines.push("    reset_pin:");
-        lines.push("      number: GPIO10");
-        lines.push("      inverted: false");
-        lines.push("    busy_pin:");
-        lines.push("      number: GPIO4");
-        lines.push("      inverted: true");
-        lines.push("    update_interval: never");
-    } else if (deviceModel === "esp32_s3_photopainter") {
-        // Waveshare PhotoPainter (7-Color) configuration
-        lines.push("  # Device: Waveshare PhotoPainter (7-Color)");
-        lines.push("  - platform: waveshare_epaper");
-        lines.push("    id: epaper_display");
-        lines.push("    model: 7.30in_f");
-        lines.push(`    cs_pin: ${profile.pins.display.cs}`);
-        lines.push(`    dc_pin: ${profile.pins.display.dc}`);
-        lines.push("    reset_pin:");
-        lines.push(`      number: ${profile.pins.display.reset}`);
-        lines.push("      inverted: false");
-        lines.push("    busy_pin:");
-        lines.push(`      number: ${profile.pins.display.busy}`);
-        lines.push("      inverted: true");
-        lines.push("    update_interval: never");
-    } else {
-        // Default / E1001 configuration (Waveshare)
-        lines.push("  # Device: reTerminal E1001 (Monochrome E-Paper)");
-        lines.push("  - platform: waveshare_epaper");
-        lines.push("    id: epaper_display");
-        lines.push("    model: 7.50inv2");
-        lines.push("    cs_pin: GPIO10");
-        lines.push("    dc_pin: GPIO11");
-        lines.push("    reset_pin:");
-        lines.push("      number: GPIO12");
-        lines.push("      inverted: false");
-        lines.push("    busy_pin:");
-        lines.push("      number: GPIO13");
-        lines.push("      inverted: true");
-        lines.push("    update_interval: never");
-    }
 
     if (useLVGL) {
         lines.push("    auto_clear_enabled: false");
@@ -1727,10 +2412,15 @@ function generateSnippetLocally() {
             lines.push("      Color COLOR_ON = Color(1);");
             lines.push("      Color COLOR_OFF = Color(0);");
         }
-        lines.push("      it.fill(COLOR_OFF);");
+        // Fill background: use COLOR_ON (black) for dark mode, COLOR_OFF (white) for normal mode
+        const bgFillColor = (payload.dark_mode && (getDeviceModel() === "reterminal_e1001" || getDeviceModel() === "trmnl")) ? "COLOR_ON" : "COLOR_OFF";
+        lines.push(`      it.fill(${bgFillColor});`);
         lines.push("");
 
         lines.push("      // --- Dithering Helpers (simulated gray) ---");
+        // Define foreground and background colors based on dark mode
+        const fgColor = (payload.dark_mode && (getDeviceModel() === "reterminal_e1001" || getDeviceModel() === "trmnl")) ? "COLOR_OFF" : "COLOR_ON";
+        const bgColor = (payload.dark_mode && (getDeviceModel() === "reterminal_e1001" || getDeviceModel() === "trmnl")) ? "COLOR_ON" : "COLOR_OFF";
         lines.push("      auto draw_dither_pixel = [&](int x, int y, Color c_on, Color c_off) {");
         lines.push("          if ((x + y) % 2 == 0) it.draw_pixel_at(x, y, c_on);");
         lines.push("          else it.draw_pixel_at(x, y, c_off);");
@@ -1739,18 +2429,18 @@ function generateSnippetLocally() {
         lines.push("      auto draw_grey_rect = [&](int x, int y, int w, int h) {");
         lines.push("          for (int i = 0; i < w; i++) {");
         lines.push("              for (int j = 0; j < h; j++) {");
-        lines.push("                  draw_dither_pixel(x + i, y + j, COLOR_ON, COLOR_OFF);");
+        lines.push(`                  draw_dither_pixel(x + i, y + j, ${fgColor}, ${bgColor});`);
         lines.push("              }");
         lines.push("          }");
         lines.push("      };");
         lines.push("");
-        // Generic mask to turn Black content into Gray (by punching white holes)
+        // Generic mask to turn foreground content into Gray (by punching background holes)
         lines.push("      auto apply_grey_dither_mask = [&](int x, int y, int w, int h) {");
         lines.push("          if (w <= 0 || h <= 0) return;");
         lines.push("          for (int i = 0; i < w; i++) {");
         lines.push("              for (int j = 0; j < h; j++) {");
         lines.push("                  if ( (x + i + y + j) % 2 != 0 ) {");
-        lines.push("                      it.draw_pixel_at(x + i, y + j, COLOR_OFF);");
+        lines.push(`                      it.draw_pixel_at(x + i, y + j, ${bgColor});`);
         lines.push("                  }");
         lines.push("              }");
         lines.push("          }");
@@ -1817,25 +2507,47 @@ function generateSnippetLocally() {
                 // Helper to map color names to ESPHome color constants
                 // For E1002 (color display): supports black, white, red, green, blue, yellow
                 // For E1001 (B&W display): only COLOR_ON and COLOR_OFF
+                // When dark_mode is enabled, invert the color mapping for monochrome displays
+                const isDarkMode = payload.dark_mode || false;
                 const getColorConst = (colorProp) => {
                     const c = (colorProp || "black").toLowerCase();
-                    if (c === "white") return "COLOR_OFF";
+
+                    // For color displays (E1002, PhotoPainter), handle extended colors first
                     if (getDeviceModel() === "reterminal_e1002") {
+                        if (c === "white") return "COLOR_OFF";
                         if (c === "red") return "COLOR_RED";
                         if (c === "green") return "COLOR_GREEN";
                         if (c === "blue") return "COLOR_BLUE";
                         if (c === "yellow") return "COLOR_YELLOW";
                         if (c === "gray") return "COLOR_GRAY";
+                        return "COLOR_ON"; // black or default
                     }
                     if (getDeviceModel() === "esp32_s3_photopainter") {
+                        if (c === "white") return "COLOR_OFF";
                         if (c === "red") return "COLOR_RED";
                         if (c === "green") return "COLOR_GREEN";
                         if (c === "blue") return "COLOR_BLUE";
                         if (c === "yellow") return "COLOR_YELLOW";
                         if (c === "orange") return "COLOR_ORANGE";
                         if (c === "gray") return "COLOR_GRAY";
+                        return "COLOR_ON"; // black or default
                     }
-                    return "COLOR_ON"; // black, gray, or any other falls back to black
+
+                    // For monochrome displays (E1001, TRMNL)
+                    // COLOR_ON = Color(1) = black pixels on e-ink
+                    // COLOR_OFF = Color(0) = white pixels on e-ink
+                    // In dark mode: background is black (COLOR_ON), widgets should be white (COLOR_OFF)
+                    // In normal mode: background is white (COLOR_OFF), widgets should be black (COLOR_ON)
+                    if (isDarkMode) {
+                        if (c === "white") return "COLOR_OFF";  // White on black background = visible (white pixels)
+                        if (c === "black") return "COLOR_ON";   // Black on black background = invisible
+                        // Gray: still use dithering approach
+                        return "COLOR_OFF"; // Default to white (visible) for dark mode
+                    } else {
+                        // Normal mode: white background
+                        if (c === "white") return "COLOR_OFF"; // White on white = invisible
+                        return "COLOR_ON"; // Black on white = visible
+                    }
 
                 };
 
@@ -1878,6 +2590,10 @@ function generateSnippetLocally() {
                             const fontId = `font_${fontFamily.toLowerCase().replace(/\s+/g, '_')}_${fontWeight}_${fontSize}${italicSuffix}`;
                             usedFontIds.add(fontId);
                             lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${fontId}), ${color}, TextAlign::${textAlign}, "${txt}");`);
+                            // Apply grey dithering if color is gray
+                            if (colorProp.toLowerCase() === "gray") {
+                                lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
+                            }
                         } else if (t === "sensor_text") {
                             const entityId = (w.entity_id || "").trim();
                             const label = (w.title || "").replace(/"/g, '\\"');
@@ -1897,7 +2613,7 @@ function generateSnippetLocally() {
                             const prefix = (p.prefix || "").replace(/"/g, '\\"');
                             const postfix = (p.postfix || "").replace(/"/g, '\\"');
 
-                            lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${label}" format:${valueFormat} label_font_size:${labelFontSize} value_font_size:${valueFontSize} color:${colorProp} text_align:${textAlign} label_align:${labelAlign} value_align:${valueAlign} precision:${precision} prefix:"${prefix}" postfix:"${postfix}" unit:"${unit}" font_family:${fontFamily} font_weight:${fontWeight} italic:${italic} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
+                            lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} entity_2:${w.entity_id_2 || ""} title:"${label}" format:${valueFormat} label_font_size:${labelFontSize} value_font_size:${valueFontSize} color:${colorProp} text_align:${textAlign} label_align:${labelAlign} value_align:${valueAlign} precision:${precision} prefix:"${prefix}" postfix:"${postfix}" unit:"${unit}" font_family:${fontFamily} font_weight:${fontWeight} italic:${italic} local:${!!p.is_local_sensor} text_sensor:${!!p.is_text_sensor} ${getCondProps(w)}`);
 
                             // Only offset X based on alignment, use w.y directly
                             // ESPHome's TextAlign handles vertical positioning semantically
@@ -1926,7 +2642,7 @@ function generateSnippetLocally() {
                             } else {
                                 // Determine if this is a text-based entity (weather, text_sensor) or numeric sensor
                                 const isTextEntity = entityId.startsWith("weather.") || entityId.startsWith("text_sensor.") || p.is_text_sensor;
-                                const safeEntityId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
+                                const safeEntityId = entityId.replace(/^(sensor|text_sensor)\./, "").replace(/\./g, "_").replace(/-/g, "_");
 
                                 const entityId2 = (w.entity_id_2 || "").trim();
                                 const safeEntityId2 = entityId2.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
@@ -2019,6 +2735,10 @@ function generateSnippetLocally() {
                                     } else {
                                         lines.push(`        it.printf(${alignX}, ${w.y} + ${TEXT_Y_OFFSET}, id(${valueFontId}), ${color}, TextAlign::${textAlign}, "${fmtSpec}", ${valueExpr});`);
                                     }
+                                }
+                                // Apply grey dithering if color is gray
+                                if (colorProp.toLowerCase() === "gray") {
+                                    lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
                                 }
                             }
 
@@ -2120,6 +2840,10 @@ function generateSnippetLocally() {
                             const fontRef = `font_mdi_${size}`;
                             lines.push(`        // widget:icon id:${w.id} type:icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} code:${code} size:${size} color:${colorProp} ${getCondProps(w)}`);
                             lines.push(`        it.print(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000${code}");`);
+                            // Apply grey dithering if color is gray
+                            if (colorProp.toLowerCase() === "gray") {
+                                lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${size}, ${size});`);
+                            }
 
                         } else if (t === "graph") {
                             const entityId = (w.entity_id || "").trim();
@@ -2311,6 +3035,10 @@ function generateSnippetLocally() {
                             const fontRef = `font_mdi_${size}`;
                             lines.push(`        // widget:icon id:${w.id} type:icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} code:${code} size:${size} color:${colorProp} ${getCondProps(w)}`);
                             lines.push(`        it.print(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000${code}");`);
+                            // Apply grey dithering if color is gray
+                            if (colorProp.toLowerCase() === "gray") {
+                                lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${size}, ${size});`);
+                            }
                         } else if (t === "battery_icon") {
                             const entityId = (w.entity_id || "").trim();
                             const size = parseInt(p.size || 24, 10);
@@ -2354,6 +3082,10 @@ function generateSnippetLocally() {
                             lines.push(`          }`);
                             lines.push(`          it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "%s", bat_icon);`);
                             lines.push(`          it.printf(${w.x} + ${size}/2, ${w.y} + ${size} + 2, id(${pctFontRef}), ${color}, TextAlign::TOP_CENTER, "%.0f%%", bat_level);`);
+                            // Apply grey dithering if color is gray
+                            if (colorProp.toLowerCase() === "gray") {
+                                lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
+                            }
                             lines.push(`        }`);
                         } else if (t === "weather_icon") {
                             const entityId = (w.entity_id || "").trim();
@@ -2384,12 +3116,22 @@ function generateSnippetLocally() {
                                 lines.push(`          else if (weather_state == "windy") icon = "\\U000F059D";`);
                                 lines.push(`          else if (weather_state == "windy-variant") icon = "\\U000F059E";`);
                                 lines.push(`          it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "%s", icon);`);
+                                // Apply grey dithering if color is gray
+                                if (colorProp.toLowerCase() === "gray") {
+                                    lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${size}, ${size});`);
+                                }
                                 lines.push(`        }`);
                             } else {
                                 lines.push(`        it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "\\U000F0595");`);
+                                // Apply grey dithering if color is gray
+                                if (colorProp.toLowerCase() === "gray") {
+                                    lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${size}, ${size});`);
+                                }
                             }
                         } else if (t === "calendar") {
                             const entityId = (p.entity_id || "sensor.esp_calendar_data").trim();
+                            // Sanitize widget ID by replacing hyphens with underscores (ESPHome requirement)
+                            const safeWidgetId = w.id.replace(/-/g, "_");
                             const borderWidth = parseInt(p.border_width || 2, 10);
                             const showBorder = p.show_border !== false;
                             const colorProp = p.text_color || "black";
@@ -2428,22 +3170,41 @@ function generateSnippetLocally() {
                             usedFontIds.add(fontEventDay);
                             usedFontIds.add(fontEvent);
 
-                            lines.push(`        // widget:calendar id:${w.id} type:calendar x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} border_width:${borderWidth} show_border:${showBorder} color:"${colorProp}" font_size_date:${szDate} font_size_day:${szDay} font_size_grid:${szGrid} font_size_event:${szEvent} ${getCondProps(w)}`);
+                            lines.push(`        // widget:calendar id:${w.id} type:calendar x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} border_width:${borderWidth} show_border:${showBorder} border_color:${borderColorProp} background_color:${bgColorProp} text_color:${colorProp} font_size_date:${szDate} font_size_day:${szDay} font_size_grid:${szGrid} font_size_event:${szEvent} ${getCondProps(w)}`);
                             lines.push(`        {`);
                             lines.push(`          auto time = id(ha_time).now();`);
 
                             // Background
                             lines.push(`          it.filled_rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${bgColor});`);
+                            // Apply gray dithering for background if needed
+                            if (bgColorProp.toLowerCase() === 'gray') {
+                                lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
+                            }
+
                             if (showBorder) {
                                 lines.push(`          it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${borderColor});`);
+                                // Apply gray dithering for border if needed
+                                if (borderColorProp.toLowerCase() === 'gray') {
+                                    lines.push(`          // Apply dither to border (draw over with dithered pattern)`);
+                                    lines.push(`          for (int i = 0; i < ${borderWidth}; i++) {`);
+                                    lines.push(`            for (int x = ${w.x}; x < ${w.x} + ${w.width}; x++) {`);
+                                    lines.push(`              if ((x + ${w.y} + i) % 2 != 0) it.draw_pixel_at(x, ${w.y} + i, COLOR_OFF);`);
+                                    lines.push(`              if ((x + ${w.y} + ${w.height} - 1 - i) % 2 != 0) it.draw_pixel_at(x, ${w.y} + ${w.height} - 1 - i, COLOR_OFF);`);
+                                    lines.push(`            }`);
+                                    lines.push(`            for (int y = ${w.y}; y < ${w.y} + ${w.height}; y++) {`);
+                                    lines.push(`              if ((${w.x} + i + y) % 2 != 0) it.draw_pixel_at(${w.x} + i, y, COLOR_OFF);`);
+                                    lines.push(`              if ((${w.x} + ${w.width} - 1 - i + y) % 2 != 0) it.draw_pixel_at(${w.x} + ${w.width} - 1 - i, y, COLOR_OFF);`);
+                                    lines.push(`            }`);
+                                    lines.push(`          }`);
+                                }
                             }
 
                             lines.push(`          int cx = ${w.x} + (${w.width} / 2);`);
 
                             // Header: Date
                             lines.push(`          it.printf(cx, ${w.y} + 10, id(${fontBig}), ${color}, TextAlign::TOP_CENTER, "%d", time.day_of_month);`);
-                            lines.push(`          it.printf(cx, ${w.y} + 110, id(${fontDay}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_day_name_${w.id}).state.c_str());`);
-                            lines.push(`          it.printf(cx, ${w.y} + 140, id(${fontDate}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_date_month_year_${w.id}).state.c_str());`);
+                            lines.push(`          it.printf(cx, ${w.y} + 110, id(${fontDay}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_day_name_${safeWidgetId}).state.c_str());`);
+                            lines.push(`          it.printf(cx, ${w.y} + 140, id(${fontDate}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_date_month_year_${safeWidgetId}).state.c_str());`);
 
                             // Calendar Grid
                             lines.push(`          int calendar_y_pos = ${w.y} + 180;`);
@@ -2472,11 +3233,17 @@ function generateSnippetLocally() {
                             lines.push(`          }`);
                             lines.push(`          it.line(start_x, calendar_y_pos + cell_height, ${w.x} + ${w.width} - 20, calendar_y_pos + cell_height, ${color});`);
 
+                            // Apply gray dithering for text/grid elements if needed
+                            if (colorProp.toLowerCase() === 'gray') {
+                                lines.push(`          // Apply dither to all text elements`);
+                                lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
+                            }
+
                             // Events List (using ArduinoJson implicitly via ESPHome json component which should be enabled by text_sensor having json attribute, but here we parse manually)
                             // IMPORTANT: We need `json:` in config if not present. 
                             lines.push(`          // Events`);
-                            lines.push(`          if (id(calendar_json_${w.id}).state != "unknown" && id(calendar_json_${w.id}).state.length() > 2) {`);
-                            lines.push(`             json::parse_json(id(calendar_json_${w.id}).state, [&](JsonObject root) -> bool {`);
+                            lines.push(`          if (id(calendar_json_${safeWidgetId}).state != "unknown" && id(calendar_json_${safeWidgetId}).state.length() > 2) {`);
+                            lines.push(`             json::parse_json(id(calendar_json_${safeWidgetId}).state, [&](JsonObject root) -> bool {`);
                             // Note: parse_json yields the root object/array. The input is an array of entries? 
                             // The reference does: deserializeJson(doc, json_string); JsonArray entries = doc.as<JsonArray>();
                             // In ESPHome lambda `json::parse_json`: 
@@ -2497,7 +3264,7 @@ function generateSnippetLocally() {
                             // If `entries` is a list `[...]`, `parse_json` might fail if it expects `{}`.
                             // Let's rely on standard ArduinoJson `deserializeJson` locally since we are in a lambda.
                             lines.push(`              JsonDocument doc;`);
-                            lines.push(`              DeserializationError error = deserializeJson(doc, id(calendar_json_${w.id}).state.c_str());`);
+                            lines.push(`              DeserializationError error = deserializeJson(doc, id(calendar_json_${safeWidgetId}).state.c_str());`);
                             lines.push(`              if (!error) {`);
                             lines.push(`                  JsonArray entries = doc.as<JsonArray>();`);
                             lines.push(`                  int y_cursor = calendar_y_pos + (7 * cell_height) + 20;`);
@@ -2802,8 +3569,8 @@ function generateSnippetLocally() {
                                 let fx = w.x, fy = w.y, fw = w.width, fh = w.height, fr = r;
 
                                 if (showBorder) {
-                                    lines.push(`          // Draw Black Border (Outer)`);
-                                    lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, COLOR_ON);`);
+                                    lines.push(`          // Draw Border (Outer)`);
+                                    lines.push(`          draw_rrect(${w.x}, ${w.y}, w, h, r, ${color});`);
 
                                     // Shrink for fill
                                     const t = thickness;
@@ -2856,7 +3623,7 @@ function generateSnippetLocally() {
                                 lines.push(`          // Erase center to create outline`);
                                 lines.push(`          int t = ${thickness};`);
                                 lines.push(`          int ir = r - t; if (ir < 0) ir = 0;`);
-                                lines.push(`          draw_rrect(${w.x} + t, ${w.y} + t, w - 2*t, h - 2*t, ir, COLOR_OFF);`);
+                                lines.push(`          draw_rrect(${w.x} + t, ${w.y} + t, w - 2*t, h - 2*t, ir, ${bgFillColor});`);
                             }
 
                             lines.push(`        }`);

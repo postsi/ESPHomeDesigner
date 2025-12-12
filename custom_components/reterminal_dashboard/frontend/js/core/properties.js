@@ -365,6 +365,9 @@ class PropertiesPanel {
                     this.autoPopulateTitleFromEntity(widget.id, v);
                 }
             }, widget);
+            // Text Sensor toggle (auto-detected when entity is selected)
+            this.addCheckbox("Text Sensor (string value)", props.is_text_sensor || false, (v) => updateProp("is_text_sensor", v));
+            this.addHint("Enable if entity returns text instead of numbers.");
             this.addLabeledInputWithPicker("Secondary Entity ID", "text", widget.entity_id_2 || "", (v) => {
                 AppState.updateWidget(widget.id, { entity_id_2: v });
             }, widget);

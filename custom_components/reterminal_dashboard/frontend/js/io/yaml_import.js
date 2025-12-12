@@ -292,6 +292,7 @@ function parseSnippetYamlOffline(yamlText) {
                         label_align: p.label_align || p.align || p.text_align || "TOP_LEFT",
                         value_align: p.value_align || p.align || p.text_align || "TOP_LEFT",
                         is_local_sensor: (p.local === "true"),
+                        is_text_sensor: (p.text_sensor === "true"),
                         separator: p.separator || " ~ "
                     };
                     widget.entity_id_2 = p.entity_2 || "";
@@ -418,6 +419,17 @@ function parseSnippetYamlOffline(yamlText) {
                         text_align: p.align || p.text_align || "TOP_LEFT",
                         word_wrap: (p.word_wrap !== "false" && p.wrap !== "false"),
                         italic_quote: (p.italic_quote !== "false")
+                    };
+                } else if (widgetType === "weather_forecast") {
+                    widget.props = {
+                        weather_entity: p.weather_entity || "",
+                        layout: p.layout || "horizontal",
+                        show_high_low: (p.show_high_low !== "false"),
+                        day_font_size: parseInt(p.day_font_size || 12, 10),
+                        temp_font_size: parseInt(p.temp_font_size || 14, 10),
+                        icon_size: parseInt(p.icon_size || 32, 10),
+                        font_family: p.font_family || "Roboto",
+                        color: p.color || "black"
                     };
                 } else if (widgetType === "lvgl_button") {
                     widget.props = {

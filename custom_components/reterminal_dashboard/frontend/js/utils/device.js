@@ -14,6 +14,9 @@ function getDeviceModel() {
  * @returns {string}
  */
 function getDeviceDisplayName(model) {
+    if (window.DEVICE_PROFILES && window.DEVICE_PROFILES[model]) {
+        return window.DEVICE_PROFILES[model].name;
+    }
     switch (model) {
         case "reterminal_e1002": return "reTerminal E1002 (6-Color)";
         case "esp32_s3_photopainter": return "Waveshare PhotoPainter (7-Color)";

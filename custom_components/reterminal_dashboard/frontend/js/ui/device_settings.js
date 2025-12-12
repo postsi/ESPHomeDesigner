@@ -33,6 +33,24 @@ class DeviceSettings {
             this.closeBtn.addEventListener('click', () => this.close());
         }
 
+        // Dynamically populate device model options
+        if (this.modelInput && window.DEVICE_PROFILES) {
+            const currentVal = this.modelInput.value; // Preserve if already set
+            this.modelInput.innerHTML = "";
+            Object.entries(window.DEVICE_PROFILES).forEach(([key, profile]) => {
+                const opt = document.createElement("option");
+                opt.value = key;
+                opt.textContent = profile.name;
+                this.modelInput.appendChild(opt);
+            });
+            // Restore selection or default
+            if (currentVal && window.DEVICE_PROFILES[currentVal]) {
+                this.modelInput.value = currentVal;
+            } else {
+                this.modelInput.value = "reterminal_e1001";
+            }
+        }
+
         // Save button (hides modal, as auto-save handles the rest)
         if (this.saveBtn) {
             this.saveBtn.addEventListener('click', () => this.close());

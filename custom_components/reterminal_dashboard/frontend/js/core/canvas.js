@@ -60,6 +60,13 @@ class Canvas {
             this.canvas.classList.remove("light-mode");
         }
 
+        // Apply black background mode for canvas preview
+        if (AppState.settings.dark_mode) {
+            this.canvas.classList.add("dark");
+        } else {
+            this.canvas.classList.remove("dark");
+        }
+
         if (!page) return;
 
         for (const widget of page.widgets) {

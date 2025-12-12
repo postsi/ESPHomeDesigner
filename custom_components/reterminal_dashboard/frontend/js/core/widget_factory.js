@@ -4,8 +4,26 @@
 // getDeviceModel from device.js
 
 class WidgetFactory {
+    /**
+     * Gets the default foreground color based on dark mode setting.
+     * Returns "white" if dark mode (black background) is enabled, otherwise "black".
+     */
+    static getDefaultColor() {
+        return (AppState && AppState.settings && AppState.settings.dark_mode) ? "white" : "black";
+    }
+
+    /**
+     * Gets the default background color based on dark mode setting.
+     * Returns "black" if dark mode is enabled, otherwise "white".
+     */
+    static getDefaultBgColor() {
+        return (AppState && AppState.settings && AppState.settings.dark_mode) ? "black" : "white";
+    }
+
     static createWidget(type) {
         const id = generateId();
+        const defaultColor = WidgetFactory.getDefaultColor();
+        const defaultBgColor = WidgetFactory.getDefaultBgColor();
         const widget = {
             id,
             type,
@@ -27,7 +45,7 @@ class WidgetFactory {
                     text: "Text",
                     font_size: 20,
                     font_family: "Roboto",
-                    color: "black",
+                    color: defaultColor,
                     font_weight: 400,
                     italic: false,
                     bpp: 1,
@@ -41,7 +59,7 @@ class WidgetFactory {
                     label_font_size: 14,
                     value_font_size: 20,
                     value_format: "label_value",
-                    color: "black",
+                    color: defaultColor,
                     font_family: "Roboto",
                     font_weight: 400,
                     italic: false,
@@ -62,7 +80,7 @@ class WidgetFactory {
                     format: "time_date",
                     time_font_size: 28,
                     date_font_size: 16,
-                    color: "black",
+                    color: defaultColor,
                     italic: false,
                     font_family: "Roboto"
                 };
@@ -76,7 +94,7 @@ class WidgetFactory {
                     show_percentage: true,
                     bar_height: 15,
                     border_width: 1,
-                    color: "black"
+                    color: defaultColor
                 };
                 break;
 
@@ -86,7 +104,7 @@ class WidgetFactory {
                 widget.props = {
                     size: 24,
                     font_size: 12,  // Font size for the percentage label
-                    color: "black"
+                    color: defaultColor
                 };
                 break;
 
@@ -96,7 +114,7 @@ class WidgetFactory {
                 widget.entity_id = "weather.forecast_home";  // Default HAOS weather entity
                 widget.props = {
                     size: 48,
-                    color: "black",
+                    color: defaultColor,
                     icon_map: "default"
                 };
                 break;
@@ -111,7 +129,7 @@ class WidgetFactory {
                     icon_size: 32,
                     temp_font_size: 14,
                     day_font_size: 12,
-                    color: "black",
+                    color: defaultColor,
                     show_high_low: true,
                     font_family: "Roboto"
                 };
@@ -130,7 +148,7 @@ class WidgetFactory {
                 widget.props = {
                     fill: false,
                     border_width: 1,
-                    color: "black",
+                    color: defaultColor,
                     opacity: 100
                 };
                 break;
@@ -142,7 +160,7 @@ class WidgetFactory {
                     radius: 10,
                     border_width: 4,
                     fill: false,
-                    color: "black",
+                    color: defaultColor,
                     opacity: 100
                 };
                 break;
@@ -153,7 +171,7 @@ class WidgetFactory {
                 widget.props = {
                     fill: false,
                     border_width: 1,
-                    color: "black",
+                    color: defaultColor,
                     opacity: 100
                 };
                 break;
@@ -164,7 +182,7 @@ class WidgetFactory {
                 widget.props = {
                     code: "F0595",
                     size: 40,
-                    color: "black",
+                    color: defaultColor,
                     font_ref: "font_mdi_medium",
                     fit_icon_to_frame: true
                 };
@@ -175,7 +193,7 @@ class WidgetFactory {
                 widget.height = 3;
                 widget.props = {
                     stroke_width: 3,
-                    color: "black",
+                    color: defaultColor,
                     orientation: "horizontal"
                 };
                 break;
@@ -201,6 +219,26 @@ class WidgetFactory {
                 };
                 break;
 
+            case "quote_rss":
+                widget.width = 400;
+                widget.height = 120;
+                widget.props = {
+                    feed_url: "https://www.brainyquote.com/link/quotebr.rss",
+                    show_author: true,
+                    quote_font_size: 18,
+                    author_font_size: 14,
+                    font_family: "Roboto",
+                    font_weight: 400,
+                    color: defaultColor,
+                    text_align: "TOP_LEFT",
+                    word_wrap: true,
+                    italic_quote: true,
+                    refresh_interval: "1h",
+                    random: true,
+                    auto_scale: false
+                };
+                break;
+
             case "graph":
                 widget.width = 200;
                 widget.height = 100;
@@ -208,7 +246,7 @@ class WidgetFactory {
                     duration: "1h",
                     border: true,
                     grid: true,
-                    color: "black",
+                    color: defaultColor,
                     title: "",
                     x_grid: "",
                     y_grid: "",
@@ -229,7 +267,7 @@ class WidgetFactory {
                     value: "https://esphome.io",
                     scale: 2,
                     ecc: "LOW",
-                    color: "black"
+                    color: defaultColor
                 };
                 break;
 
@@ -238,8 +276,8 @@ class WidgetFactory {
                 widget.height = 40;
                 widget.props = {
                     text: "Button",
-                    color: "black",
-                    bg_color: "white",
+                    color: defaultColor,
+                    bg_color: defaultBgColor,
                     border_width: 2,
                     radius: 5
                 };
@@ -252,7 +290,7 @@ class WidgetFactory {
                     min: 0,
                     max: 100,
                     value: 50,
-                    color: "black",
+                    color: defaultColor,
                     title: "Arc",
                     thickness: 10
                 };
@@ -264,7 +302,7 @@ class WidgetFactory {
                 widget.props = {
                     min: 0,
                     max: 100,
-                    color: "black",
+                    color: defaultColor,
                     title: "Chart",
                     type: "LINE" // LINE or SCATTER
                 };
@@ -279,7 +317,7 @@ class WidgetFactory {
                     pivot_y: 0,
                     rotation: 0,
                     scale: 256,
-                    color: "black"
+                    color: defaultColor
                 };
                 break;
 
@@ -289,8 +327,8 @@ class WidgetFactory {
                 widget.props = {
                     text: "https://esphome.io",
                     size: 100,
-                    color: "black",
-                    bg_color: "white"
+                    color: defaultColor,
+                    bg_color: defaultBgColor
                 };
                 break;
 
@@ -301,7 +339,7 @@ class WidgetFactory {
                     min: 0,
                     max: 100,
                     value: 50,
-                    color: "black", // Main color
+                    color: defaultColor, // Main color
                     bg_color: "gray", // Background color
                     range_mode: false
                 };
@@ -314,7 +352,7 @@ class WidgetFactory {
                     min: 0,
                     max: 100,
                     value: 30,
-                    color: "black",
+                    color: defaultColor,
                     bg_color: "gray",
                     border_width: 2
                 };
@@ -327,9 +365,9 @@ class WidgetFactory {
                     entity_id: "sensor.esp_calendar_data",
                     border_width: 2,
                     show_border: true,
-                    border_color: "black",
-                    background_color: "white",
-                    text_color: "black",
+                    border_color: defaultColor,
+                    background_color: defaultBgColor,
+                    text_color: defaultColor,
                     font_size_date: 100,
                     font_size_day: 24,
                     font_size_grid: 14,
