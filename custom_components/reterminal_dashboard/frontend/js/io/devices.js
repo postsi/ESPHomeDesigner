@@ -83,6 +83,32 @@ window.DEVICE_PROFILES = {
             sht4x: false
         }
     },
+    trmnl_diy_esp32s3: {
+        name: "Seeed Studio Trmnl DIY Kit (ESP32-S3)",
+        displayModel: "7.50inv2p",
+        displayPlatform: "waveshare_epaper",
+        psram_mode: "octal",
+        pins: {
+            display: { cs: "GPIO44", dc: "GPIO10", reset: "GPIO38", busy: { number: "GPIO4", inverted: true } },
+            i2c: { sda: "GPIO17", scl: "GPIO18" }, // Generic S3 defaults, user didn't specify I2C but it's good to have placeholder
+            spi: { clk: "GPIO7", mosi: "GPIO9" },
+            batteryEnable: "GPIO6",
+            batteryAdc: "GPIO1",
+            buzzer: null,
+            buttons: { left: "GPIO2", refresh: "GPIO5" } // Key1=Wake/Left, Key3=Refresh
+        },
+        battery: {
+            attenuation: "12db", // As per user yaml
+            multiplier: 2.0,
+            calibration: { min: 3.27, max: 4.15 }
+        },
+        features: {
+            psram: true,
+            buzzer: false,
+            buttons: true,
+            sht4x: false
+        }
+    },
     m5stack_coreink: {
         name: "M5Stack CoreInk (200x200)",
         displayModel: "1.54in-m5coreink-m09",

@@ -3,6 +3,21 @@
 
 
 
+## v0.7.4 - Trmnl DIY Support
+
+**Release Date:** December 17, 2025
+
+### 🚀 New Hardware Support
+- **Seeed Studio Trmnl DIY Kit (ESP32-S3)**: Added full support for the Trmnl DIY Kit, including:
+  - Correct pin mappings for display, buttons, battery, and SPI.
+  - Support for `7.50inv2p` display model with partial update capabilities.
+  - Automatic `inverted` color handling to fix "Dark Mode" logic (Hardware White is treated as logical White).
+
+### 🐛 Bug Fixes
+- **QR Code Widget**: Fixed a regression where the `qr_code` component definition was missing from the generated YAML, causing "Couldn't find ID" errors.
+
+---
+
 ## v0.7.3 - Hotfix
 
 **Release Date:** December 17, 2025

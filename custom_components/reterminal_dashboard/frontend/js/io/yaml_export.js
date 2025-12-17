@@ -38,6 +38,7 @@ function generateSnippetLocally() {
     const graphWidgets = [];
     const weatherForecastWidgets = [];
     const onlineImageWidgets = [];
+    const qrCodeWidgets = [];
     const staticImageMap = new Map();
 
     pagesLocal.forEach(p => {
@@ -55,6 +56,9 @@ function generateSnippetLocally() {
                 }
                 if (t === "puppet" || t === "online_image") {
                     onlineImageWidgets.push(w);
+                }
+                if (t === "qr_code") {
+                    qrCodeWidgets.push(w);
                 }
                 if (t === "image") {
                     const path = (w.props?.path || "").trim();
@@ -104,6 +108,10 @@ function generateSnippetLocally() {
         lines.push("#         - Board: m5stack-paper");
         lines.push("#         - Framework: arduino (Required)");
         lines.push("#         - Flash Size: 16MB");
+    } else if (getDeviceModel() === "trmnl_diy_esp32s3") {
+        lines.push("#         - Select: ESP32-S3");
+        lines.push("#         - Board: esp32-s3-devkitc-1");
+        lines.push("#         - Framework: esp-idf (Recommended) or arduino");
     } else {
         lines.push("#         - Select: ESP32-S3 (or appropriate for your board)");
     }
@@ -594,6 +602,22 @@ function generateSnippetLocally() {
         lines.push("");
     }
 
+    // Generate qr_code: component declarations
+    if (qrCodeWidgets.length > 0) {
+        lines.push("qr_code:");
+        qrCodeWidgets.forEach(w => {
+            const p = w.props || {};
+            const safeId = `qr_${w.id}`.replace(/-/g, "_");
+            const value = (p.value || "https://esphome.io").replace(/"/g, '\\"');
+            const ecc = p.ecc || "LOW";
+
+            lines.push(`  - id: ${safeId}`);
+            lines.push(`    value: "${value}"`);
+            lines.push(`    ecc: ${ecc}`);
+        });
+        lines.push("");
+    }
+
     // ========================================================================
     // TEXT SENSOR SECTION (Widget sensors: quotes, weather conditions)
     // ========================================================================
@@ -1007,7 +1031,7 @@ function generateSnippetLocally() {
             const RECT_Y_OFFSET = -15;
             const TEXT_Y_OFFSET = 0;
 
-            if (getDeviceModel() === "m5stack_paper" || getDeviceModel() === "reterminal_e1001") {
+            if (getDeviceModel() === "m5stack_paper" || getDeviceModel() === "reterminal_e1001" || getDeviceModel() === "trmnl_diy_esp32s3") {
                 lines.push("      const auto COLOR_WHITE = Color(0, 0, 0); // Inverted for e-ink");
             } else {
                 lines.push("      const auto COLOR_WHITE = Color(255, 255, 255);");
@@ -1023,7 +1047,7 @@ function generateSnippetLocally() {
             // - Red(255,0,0)     -> Shows WHITE/Invisible
             // - Display is 6-color (Black, White, Red, Green, Blue, Yellow)
             // ============================================================================
-            if (getDeviceModel() === "m5stack_paper" || getDeviceModel() === "reterminal_e1001") {
+            if (getDeviceModel() === "m5stack_paper" || getDeviceModel() === "reterminal_e1001" || getDeviceModel() === "trmnl_diy_esp32s3") {
                 lines.push("      const auto COLOR_BLACK = Color(255, 255, 255); // Inverted for e-ink");
             } else {
                 lines.push("      const auto COLOR_BLACK = Color(0, 0, 0);");
