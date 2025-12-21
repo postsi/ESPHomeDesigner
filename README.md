@@ -2,19 +2,25 @@
 
 **A visual drag-and-drop editor for ESPHome displays (E-Ink, OLED, LCD, Touch), running right inside Home Assistant.**
 
-
-
 <div align="center">
-  <a href="https://youtu.be/bzCbiUypN_4">
-    <img src="screenshots/Reterminal_Designer_v05.gif" alt="Watch the video">
+  <a href="https://youtu.be/3AVGze6F_5o">
+    <img src="https://img.youtube.com/vi/3AVGze6F_5o/maxresdefault.jpg" alt="Watch the v0.8.0 Feature Walkthrough" width="600">
   </a>
   <br>
-  <small>Click to watch the demo video</small>
+  <a href="https://youtu.be/3AVGze6F_5o">
+    <img src="https://img.shields.io/badge/YouTube-Watch%20v0.8.0%20Overview-red?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Video">
+  </a>
+  <br>
+  <strong>▶️ Click to watch the latest feature walkthrough</strong>
 </div>
 
-
-
 **No more hand-coding ESPHome display lambdas! 🎉**
+
+---
+
+
+---
+
 
 Building a custom smart display for Home Assistant? Frustrated with manually writing C++ lambdas and guessing coordinates?
 
@@ -22,10 +28,10 @@ Design ESPHome displays right inside Home Assistant. This HACS integration offer
 
 It enables you to build premium, touch-interactive dashboards for various ESP32-based devices (like the Seeed reTerminal, TRMNL, standard touch screens, and more) without writing a single line of display code.
 
-
 ## What Does It Do?
 
 - **Visual drag-and-drop editor** - Design layouts in your browser, see your actual HA entities update live on the canvas
+  <p align="center"><img src="screenshots/draganddrop.gif" width="800" alt="Drag & Drop Editor"></p>
 - **Multiple pages** - Navigate with hardware buttons, set different refresh rates per page
 - **Auto-generates ESPHome config** - Clean, readable YAML that you can paste into your existing ESPHome setup
 - **Round-trip editing** - Import existing ESPHome configs back into the editor
@@ -72,7 +78,8 @@ Then create a new ESPHome device:
 3. Drag widgets onto the canvas
 4. Add your sensors, weather entities, icons, shapes
 5. Create multiple pages with different refresh rates
-6. Click **"Generate Snippet"**
+6. **Live Preview**: Your YAML is generated on the fly as you design! Just look at the YAML snippet box.
+   <p align="center"><img src="screenshots/modern_canvas.gif" width="800" alt="Modern Canvas Interaction"></p>
 
 ### 5. Flash It
 
@@ -101,57 +108,20 @@ We expose everything (buttons, sensors, battery) back to Home Assistant. Does a 
 
 ## Widget Types
 
-- **Text** - Static labels and headers
-  - Customizable font size (8-260px) - generates fonts automatically
-  - Color options: black, white, **gray** (renders as dithered pattern)
-- **Sensor Text** - Live values from Home Assistant entities
-  - **Smart Type Detection**: Automatically detects number vs string functionality
-  - **Manual Override**: "Is Text Sensor" option for forced text handling
-  - Separate font sizes for label and value
-  - Multiple display formats (value only, label + value, stacked)
-- **Icon** - Material Design Icons with customizable size and color
-  - Choose from 360+ most-used Material Design Icons
-  - Adjustable size (8-260px) - generates optimized fonts automatically
-  - Color options: black, white, gray (limited by e-paper)
-- **Weather Icon** - Dynamic weather icons based on Home Assistant state
-  - Automatically maps standard HA weather states (sunny, rainy, cloudy, etc.) to MDI icons
-  - Customizable size and color
-- **Date & Time** - Display current time and date
-  - Separate font sizes for time and date
-  - Multiple format options (time only, date only, both)
-  - Automatically synced with Home Assistant time
-- **Progress Bar** - Visual progress indicators from sensor values
-  - Links to Home Assistant percentage sensors
-  - Customizable bar height and border width
-  - Shows fill based on 0-100% sensor values
-- **Battery Icon** - Dynamic battery level display
-  - Links to battery level sensors
-  - Icon changes based on battery percentage
-  - Shows percentage text below icon
-- **Shapes** - Rectangles, filled rectangles, circles, filled circles, lines
-  - Gray color renders as dithered pattern for visual distinction
-- **Graph** - Plot sensor history over time
-  - Configurable duration (1h to 30d)
-  - Customizable line style (solid, dashed, dotted), thickness, and color
-  - Optional X/Y grid lines with presets
-  - Auto-scaling Y-axis based on sensor min/max attributes
-  - Automatic X/Y axis labeling based on time and value range
-- **Image** - Display photos and images with optional color inversion
-  - Widget frame size sets ESPHome `resize:` parameter automatically
-  - Images are resized during compilation (quality preserved with FLOYDSTEINBERG dithering)
-- **Online Image** - Fetch and display images from URLs
-  - Useful for weather maps, camera feeds, or dynamic content
-- **Quote / RSS Feed** - Display inspirational quotes or RSS feed content
-  - Configurable RSS feed URL with popular defaults
-  - Random quote selection, author display, italic styling
-  - Adjustable refresh interval (15min to 24h)
-- **QR Code** - Generate QR codes directly on the display
-  - Configurable content string (URLs, text, etc.)
-  - Four error correction levels
-  - Auto-scaling to fit widget dimensions
-- **Weather Forecast** - Multi-day weather forecast display
-  - Shows upcoming weather conditions with icons
-  - Integrates with Home Assistant weather entities
+- **Text & Sensor Text** - Static labels or live HA entity values with smart type detection and multiple formatting options
+  <p align="center"><img src="screenshots/text_formatting.gif" width="700" alt="Rich Text Formatting"></p>
+- **Icon & Weather Icon** - 360+ Material Design Icons or dynamic weather-state icons with full size/color control
+  <p align="center"><img src="screenshots/icon_picker.gif" width="700" alt="Icon Picker System"></p>
+- **Date, Time & Calendar** - Customizable clock, date, and full monthly calendar views
+- **Progress Bar & Battery** - Visual indicators for percentages and dynamic battery level tracking
+- **Shapes & Rounded Rects** - Rectangles, circles, lines, and rounded rects with gray/dither support
+- **Graph** - Advanced sensor history plotting with auto-scaling, grid lines, and X/Y axis labeling
+- **Image & Online Image** - Static photos or dynamic URLs (weather maps, cameras) with auto-dithering
+- **Quote / RSS Feed** - Inspirational quotes or external RSS feeds with auto-scaling and refresh logic
+- **QR Code** - Dynamic QR generation for URLs or text with adjustable error correction
+- **Touch Area** - Invisible or icon-labeled interactive zones to trigger HA actions (supports dual-state feedback)
+  <p align="center"><img src="screenshots/touch_icons.gif" width="700" alt="Touch Interactive Icons"></p>
+- **Weather Forecast** - Multi-day forecast display integrated with HA weather entities
 
 ## LVGL Support (Experimental)
 
@@ -184,32 +154,31 @@ For stable results, stick to **Native Mode** (standard widgets without LVGL pref
 - **Productivity Tools** - Copy/Paste (Ctrl+C/V), Undo/Redo (Ctrl+Z/Y), and Z-Index layering support
 - **Canvas Controls** - Zoom in/out and recenter for precise editing
 - **Dark Mode Option** - Toggle "Dark Mode" in device settings for black backgrounds
-- **Hardware Integration** - Buttons, buzzer, temperature/humidity sensors exposed to HA
+- **Hardware Integration** - Buttons, buzzer, temperature, humidity sensors exposed to HA
 - **Smart Generator** - Produces clean, additive YAML that doesn't conflict with your base config
 - **Template-Free Workflow** - No more manual template merging, just paste and go
-- **Live YAML Preview** - Select any widget to instantly highlight its corresponding code in the generated YAML snippet
-- **Round-Trip Editing** - Import existing ESPHome display code back into the editor
-- **Battery Management** - Voltage monitoring, battery level percentage, icon indicators
-- **Power Saving** - Configurable refresh rates, deep sleep support for night hours
-- **Experimental LVGL Support** - (Beta) Support for LVGL widgets like Arc and Button on capable devices
+- **Live YAML Generation** - Your YAML is generated on the fly as you design; no more "Generate" buttons
+- **RGB Color Picker** - Precise color control for e-paper and LCD widgets
+  <p align="center"><img src="screenshots/rgb_picker.gif" width="700" alt="RGB Color Picker"></p>
+- **Round-Trip Editing** - Import existing ESPHome code back into the editor (now supports LVGL widgets!)
+  <p align="center"><img src="screenshots/yaml_parsing.gif" width="700" alt="YAML Round-Trip Import"></p>
+- **Power & Battery Management** - Monitoring, deep sleep support, and configurable refresh intervals
+- **Modern Canvas Interaction** - Zoom with the mouse wheel and pan with the middle mouse button
+- **Drag & Drop Workflow** - Drag widgets directly from the sidebar onto the canvas
+- **Modular Hardware Profiles** - Support for loading hardware profiles from external YAML packages
+- **Experimental LVGL Support** - (Beta) Support for interactive LVGL widgets on capable devices
+- **Mobile Support** - Responsive UI designed to work on smaller screens and touch devices
 
 ## Technical Details
 
 The generator produces **complete, standalone YAML** - no templates needed!
 
 **What it generates (everything you need):**
-- Hardware configuration: `esphome:`, `esp32:`, `psram:`, `i2c:`, `spi:`
-- Display driver and settings
-- `globals:` - Display page tracking, refresh intervals
-- `font:` - Dynamic font generation based on your widget sizes + Material Design Icons
-- `image:` - Image definitions for photo/image widgets
-- `online_image:` - Definitions for online image widgets
-- `text_sensor:` - Home Assistant entities used in your widgets
-- `graph:` - Graph widget configurations
-- `button:` - Page navigation and refresh controls (exposed to HA)
-- `script:` - Smart refresh logic with per-page interval support
-- `deep_sleep:` - Power saving logic (if enabled)
-- `display:` - Lambda code that renders your layout
+- **Hardware Config**: `psram`, `i2c`, `spi`, `external_components`, and device-specific sections (`m5paper`, `axp2101`)
+- **Core Components**: `http_request`, `time` (Home Assistant), `globals` (page tracking), and `deep_sleep`
+- **Widgets & Assets**: `font` (MDI icons), `image` (deduplicated), `online_image`, `graph`, and `qr_code`
+- **HA Integration**: `sensor`, `text_sensor`, `binary_sensor`, `button`, and `switch` entities
+- **Logic & Display**: `script` (smart refresh), `display` (lambda code), and `lvgl` (if enabled)
 
 **What ESPHome provides** (auto-generated when you create a device):
 - `wifi:`, `api:`, `ota:`, `logger:`
@@ -220,11 +189,10 @@ The workflow is safe and deterministic - same layout always produces the same YA
 ## Hardware Support
 
 **Currently Supported:**
-- Seeed Studio reTerminal E1001 (ESP32-S3, 800x480 e-paper, black/white)
-- Seeed Studio reTerminal E1002 (ESP32-S3, 800x480 e-paper, color)
-- Waveshare PhotoPainter (ESP32-S3, 7-Color e-paper)
-- TRMNL (ESP32-C3 e-paper device)
-- *More coming soon!* (Experimental devices marked as "untested" in editor)
+- **Seeed Studio**: reTerminal E1001 (BW), reTerminal E1002 (Color), Trmnl DIY Kit (S3)
+- **Waveshare**: PhotoPainter (7-Color), Touch LCD 4.3" & 7.0" (S3)
+- **M5Stack**: M5Paper (Touch), M5Stack CoreInk
+- **TRMNL**: Original ESP32-C3 e-paper device
 
 **Hardware Features Exposed:**
 - 3 physical buttons (GPIO 3/4/5)
@@ -234,6 +202,7 @@ The workflow is safe and deterministic - same layout always produces the same YA
 - WiFi signal strength
 
 All exposed as Home Assistant entities for use in automations.
+
 
 ## Repository Structure
 
@@ -273,10 +242,21 @@ Add `compile_process_limit: 1` to your `esphome:` section in the YAML. This redu
 4. **Compile**: Run this command:
    ```powershell
    python -m esphome compile C:\esphome_build\reterminal.yaml
-   ```
-5. **Upload**: Take the generated `.bin` file and upload it via the Home Assistant ESPHome dashboard (Install → Manual Download).
+Upload: Take the generated .bin file and upload it via the Home Assistant ESPHome dashboard (Install → Manual Download).
+
+
+## Video Overview (Legacy)
+
+Looking for a deep dive? While some UI elements have evolved, you can watch an **[explanation video of an older version here](https://youtu.be/bzCbiUypN_4)** to understand the core concepts.
 
 ## License
 
 Made with love ❤️ - free and Open Source under the GPL 3.0 license. Share the love!
 
+<div align="center">
+
+☕ **If you find this project useful, consider supporting its development!**
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤️-ff69b4?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/koosoli)
+
+</div>

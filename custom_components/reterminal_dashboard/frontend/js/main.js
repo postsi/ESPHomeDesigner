@@ -42,7 +42,6 @@ class App {
 
         // Initialize UI components
         this.sidebar.init();
-        this.canvas.init();
         this.propertiesPanel.init();
         this.deviceSettings.init();
         this.editorSettings.init();
@@ -60,6 +59,7 @@ class App {
         if (hasHaBackend()) {
             console.log("HA Backend detected. Loading layout from backend...");
             await loadLayoutFromBackend();
+            await loadExternalProfiles(); // Load dynamic hardware templates
             await fetchEntityStates();
         } else {
             console.log("Running in standalone/offline mode.");
@@ -97,13 +97,6 @@ class App {
             loadLayoutBtn.addEventListener('change', handleFileSelect);
         }
 
-        // Generate Snippet Button (Modal)
-        const generateSnippetBtn = document.getElementById('generateSnippetBtn');
-        if (generateSnippetBtn) {
-            generateSnippetBtn.addEventListener('click', () => {
-                this.openSnippetModal();
-            });
-        }
 
         const fullscreenSnippetBtn = document.getElementById('fullscreenSnippetBtn');
         if (fullscreenSnippetBtn) {
@@ -118,7 +111,6 @@ class App {
                 const modal = document.getElementById('snippetFullscreenModal');
                 if (modal) {
                     modal.classList.add('hidden');
-                    modal.style.display = 'none';
                 }
             });
         }
@@ -232,16 +224,20 @@ class App {
                 }
 
                 try {
-                    const yaml = generateSnippetLocally();
-                    snippetBox.value = yaml;
-                    // console.log("Snippet box updated.");
+                    generateSnippetLocally().then(yaml => {
+                        snippetBox.value = yaml;
+                        // console.log("Snippet box updated.");
 
-                    // Re-highlight the selected widget if any
-                    // This is needed because the initial highlight attempt (on selection change)
-                    // might have failed if the widget wasn't in the YAML yet (due to debounce)
-                    if (window.AppState && window.AppState.selectedWidgetId && typeof highlightWidgetInSnippet === 'function') {
-                        highlightWidgetInSnippet(window.AppState.selectedWidgetId);
-                    }
+                        // Re-highlight the selected widget if any
+                        // This is needed because the initial highlight attempt (on selection change)
+                        // might have failed if the widget wasn't in the YAML yet (due to debounce)
+                        if (window.AppState && window.AppState.selectedWidgetId && typeof highlightWidgetInSnippet === 'function') {
+                            highlightWidgetInSnippet(window.AppState.selectedWidgetId);
+                        }
+                    }).catch(e => {
+                        console.error("Error generating snippet async:", e);
+                        snippetBox.value = "# Error generating YAML (async): " + e.message;
+                    });
                 } catch (e) {
                     console.error("Error generating snippet:", e);
                     snippetBox.value = "# Error generating YAML: " + e.message;
@@ -300,6 +296,7 @@ class App {
             }
         }
         textarea.value = snippetBox.value || "";
+        modal.style.display = ""; // Clear any inline display: none
         modal.classList.remove('hidden');
     }
 
@@ -315,10 +312,17 @@ class App {
             if (errorBox) errorBox.textContent = "";
 
             let layout;
-            if (hasHaBackend()) {
-                layout = await importSnippetBackend(yaml);
-            } else {
+            // Always try offline parser first for snippets as it's more robust for native LVGL
+            try {
                 layout = parseSnippetYamlOffline(yaml);
+                console.log("[handleImportSnippet] Successfully used offline parser.");
+            } catch (offlineErr) {
+                console.warn("[handleImportSnippet] Offline parser failed, falling back to backend:", offlineErr);
+                if (hasHaBackend()) {
+                    layout = await importSnippetBackend(yaml);
+                } else {
+                    throw offlineErr;
+                }
             }
 
             loadLayoutIntoState(layout);

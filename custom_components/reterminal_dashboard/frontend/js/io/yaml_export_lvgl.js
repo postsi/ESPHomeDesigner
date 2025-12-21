@@ -122,19 +122,21 @@ function serializeWidget(w) {
         Object.entries(w.props).forEach(([k, v]) => {
             if (v === undefined || v === null) return;
 
-            // Handle arrays (like tabs)
-            if (Array.isArray(v)) {
-                const arrStr = v.join(",");
-                parts.push(`${k}:"${arrStr}"`);
+            // Handle arrays and objects in marker comments
+            if (typeof v === 'object') {
+                try {
+                    const jsonStr = JSON.stringify(v);
+                    parts.push(`${k}:'${jsonStr}'`);
+                } catch (e) {
+                    // Skip if cyclic or too complex
+                }
                 return;
             }
 
-            // Handle objects - skip them for now as they're too complex for flat serialization
-            if (typeof v === 'object') return;
-
             const valStr = String(v);
-            if (valStr.includes(' ') || valStr === "" || valStr.includes('\n')) {
-                // Escape newlines for options
+            if (typeof v === 'number') {
+                parts.push(`${k}:${v}`);
+            } else if (valStr.includes(' ') || valStr === "" || valStr.includes('\n')) {
                 parts.push(`${k}:"${valStr.replace(/\n/g, '\\n')}"`);
             } else {
                 parts.push(`${k}:${valStr}`);
@@ -162,7 +164,14 @@ function transpileToLVGL(w, profile) {
         x: x,
         y: y,
         width: w_w,
-        height: w_h
+        height: w_h,
+        hidden: p.hidden || undefined,
+        clickable: p.clickable === false ? false : undefined,
+        checkable: p.checkable || undefined,
+        scrollable: p.scrollable === false ? false : undefined,
+        floating: p.floating || undefined,
+        ignore_layout: p.ignore_layout || undefined,
+        scrollbar_mode: p.scrollbar_mode !== "AUTO" ? p.scrollbar_mode : undefined
     };
 
     switch (w.type) {
@@ -187,6 +196,7 @@ function transpileToLVGL(w, profile) {
                     border_width: p.border_width,
                     border_color: convertColor(p.color),
                     radius: p.radius,
+                    opa: p.opa,
                     widgets: [
                         {
                             label: {
@@ -259,6 +269,9 @@ function transpileToLVGL(w, profile) {
                     indicator: {
                         arc_color: convertColor(p.color) // Active part color
                     },
+                    start_angle: p.start_angle,
+                    end_angle: p.end_angle,
+                    mode: p.mode,
                     widgets: [
                         {
                             label: {
@@ -280,8 +293,14 @@ function transpileToLVGL(w, profile) {
                     style: {
                         bg_color: convertColor(p.bg_color || "white"),
                         border_color: convertColor(p.color),
-                        border_width: 1
+                        border_width: 1,
+                        opa: p.opa
                     },
+                    point_count: p.point_count,
+                    div_line_count: p.x_div_lines !== undefined || p.y_div_lines !== undefined ? {
+                        x: p.x_div_lines,
+                        y: p.y_div_lines
+                    } : undefined,
                     items: [
                         { // Dataset
                             line_color: convertColor(p.color),
@@ -349,7 +368,9 @@ function transpileToLVGL(w, profile) {
                     bg_color: convertColor(p.bg_color || "gray"),
                     indicator: {
                         bg_color: convertColor(p.color), // Bar color
-                    }
+                    },
+                    start_value: p.start_value,
+                    mode: p.mode
                 }
             };
 
@@ -370,7 +391,8 @@ function transpileToLVGL(w, profile) {
                         bg_color: convertColor(p.color),
                         border_width: 2,
                         border_color: "0xFFFFFF"
-                    }
+                    },
+                    mode: p.mode
                 }
             };
 
@@ -401,7 +423,8 @@ function transpileToLVGL(w, profile) {
                     height: w_h,
                     style: {
                         line_width: p.stroke_width,
-                        line_color: convertColor(p.color)
+                        line_color: convertColor(p.color),
+                        line_opa: p.opa
                     },
                     points: [
                         [0, w_h / 2],
@@ -418,7 +441,8 @@ function transpileToLVGL(w, profile) {
                     bg_opa: p.fill ? "COVER" : "TRANSP",
                     border_width: p.border_width,
                     border_color: convertColor(p.color),
-                    radius: 0
+                    radius: 0,
+                    opa: p.opa
                 }
             };
 
@@ -430,7 +454,8 @@ function transpileToLVGL(w, profile) {
                     bg_opa: p.fill ? "COVER" : "TRANSP",
                     border_width: p.border_width,
                     border_color: convertColor(p.color),
-                    radius: p.radius
+                    radius: p.radius,
+                    opa: p.opa
                 }
             };
 
@@ -442,7 +467,101 @@ function transpileToLVGL(w, profile) {
                     bg_opa: "COVER",
                     border_width: p.border_width,
                     border_color: convertColor(p.border_color),
-                    radius: p.radius
+                    radius: p.radius,
+                    opa: p.opa
+                }
+            };
+
+        case "lvgl_label":
+            return {
+                label: {
+                    ...common,
+                    text: `"${p.text || 'Label'}"`,
+                    text_font: getLVGLFont(p.font_family, p.font_size, p.font_weight, p.italic),
+                    text_color: convertColor(p.color),
+                    bg_color: p.bg_color === "transparent" ? undefined : convertColor(p.bg_color),
+                    text_align: convertAlign(p.text_align),
+                    opa: p.opa
+                }
+            };
+
+        case "lvgl_line":
+            let pointsArr;
+            const orientation = p.orientation || "horizontal";
+
+            // If points are manually specified (and old style), use them. 
+            // BUT, if we are in new "Like non-LVGL" mode, we generate based on w/h.
+            // Presence of 'orientation' property is a good indicator of new mode.
+            if (p.points && !p.orientation) {
+                if (Array.isArray(p.points)) {
+                    pointsArr = p.points.map(pt => {
+                        if (Array.isArray(pt)) return pt;
+                        const [px, py] = String(pt).split(",").map(Number);
+                        return [px, py];
+                    });
+                } else if (typeof p.points === 'string') {
+                    pointsArr = p.points.split(" ").map(pt => {
+                        const [px, py] = pt.split(",").map(Number);
+                        return [px, py];
+                    });
+                }
+            } else {
+                // Generate points from dimensions
+                const lw = p.line_width || 3;
+                if (orientation === "vertical") {
+                    // Vertical: Center X, from 0 to H
+                    // Make sure X is 0 relative to widget
+                    pointsArr = [[0, 0], [0, w_h]];
+                } else {
+                    // Horizontal: Center Y, from 0 to W
+                    pointsArr = [[0, 0], [w_w, 0]];
+                }
+            }
+
+            return {
+                line: {
+                    ...common,
+                    points: pointsArr,
+                    line_width: p.line_width || 3,
+                    line_color: convertColor(p.line_color || p.color),
+                    line_rounded: p.line_rounded !== false,
+                    line_opa: p.opa
+                }
+            };
+
+        case "lvgl_meter":
+            let meterValue = p.value || 0;
+            if (w.entity_id) {
+                const safeId = w.entity_id.replace(/^sensor\./, "").replace(/[^a-zA-Z0-9_]/g, "_");
+                meterValue = `!lambda "return id(${safeId}).state;"`;
+            }
+            return {
+                meter: {
+                    ...common,
+                    scales: {
+                        range_from: p.min || 0,
+                        range_to: p.max || 100,
+                        angle_range: 240,
+                        ticks: {
+                            count: p.tick_count || 11,
+                            length: p.tick_length || 10,
+                            color: convertColor(p.color),
+                            width: 2
+                        },
+                        scale_width: p.scale_width || 10,
+                        indicators: [
+                            {
+                                line: {
+                                    color: convertColor(p.indicator_color || "red"),
+                                    r_mod: -4,
+                                    width: p.indicator_width || 4,
+                                    value: meterValue,
+                                    color: convertColor(p.indicator_color)
+                                }
+                            }
+                        ]
+                    },
+                    opa: p.opa
                 }
             };
 
@@ -451,7 +570,10 @@ function transpileToLVGL(w, profile) {
                 tabview: {
                     ...common,
                     bg_color: convertColor(p.bg_color),
-                    tabs: (p.tabs || ["Tab 1"]).map(t => ({ name: t }))
+                    tabs: (Array.isArray(p.tabs) ? p.tabs : ["Tab 1"]).map(t => {
+                        if (typeof t === 'object' && t !== null) return t;
+                        return { name: String(t) };
+                    })
                 }
             };
 
@@ -473,7 +595,8 @@ function transpileToLVGL(w, profile) {
                 led: {
                     ...common,
                     color: convertColor(p.color),
-                    brightness: p.brightness
+                    brightness: p.brightness,
+                    opa: p.opa
                 }
             };
 
@@ -484,21 +607,26 @@ function transpileToLVGL(w, profile) {
                     spin_time: (p.spin_time || 1000) + "ms",
                     arc_length: (p.arc_length || 60) + "deg",
                     arc_color: convertColor(p.arc_color),
-                    track_color: convertColor(p.track_color)
+                    track_color: convertColor(p.track_color),
+                    opa: p.opa
                 }
             };
 
         case "lvgl_buttonmatrix":
-            const btnMatrixRows = (p.rows || []).map(r => ({
-                buttons: (r.buttons || []).map((b, i) => ({
-                    id: `btn_${i}`, // Simple ID generation
-                    text: b
-                }))
+            const btnMatrixRows = (Array.isArray(p.rows) ? p.rows : []).map(r => ({
+                buttons: (Array.isArray(r.buttons) ? r.buttons : []).map((b, i) => {
+                    if (typeof b === 'object' && b !== null) return b;
+                    return {
+                        id: `btn_${i}`,
+                        text: String(b)
+                    };
+                })
             }));
             return {
                 buttonmatrix: {
                     ...common,
-                    rows: btnMatrixRows
+                    rows: btnMatrixRows,
+                    opa: p.opa
                 }
             };
 
@@ -507,7 +635,8 @@ function transpileToLVGL(w, profile) {
                 checkbox: {
                     ...common,
                     text: `"${p.text || 'Checkbox'}"`,
-                    checked: p.checked
+                    checked: p.checked,
+                    opa: p.opa
                 }
             };
 
@@ -526,14 +655,23 @@ function transpileToLVGL(w, profile) {
             return checkboxObj;
 
         case "lvgl_dropdown":
+            let dropdownOptions = p.options || "";
+            if (Array.isArray(dropdownOptions)) {
+                dropdownOptions = dropdownOptions.map(String);
+            } else {
+                dropdownOptions = String(dropdownOptions).split("\n").filter(o => o.trim() !== "");
+            }
             return {
                 dropdown: {
                     ...common,
-                    options: (p.options || "").split("\n").filter(o => o.trim() !== ""),
+                    options: dropdownOptions,
                     selected_index: p.selected_index,
                     style: {
                         text_color: convertColor(p.color)
-                    }
+                    },
+                    direction: p.direction,
+                    max_height: p.max_height,
+                    opa: p.opa
                 }
             };
 
@@ -542,22 +680,31 @@ function transpileToLVGL(w, profile) {
                 keyboard: {
                     ...common,
                     mode: p.mode,
-                    textarea: p.textarea_id // Link to textarea
+                    textarea: p.textarea_id, // Link to textarea
+                    opa: p.opa
                 }
             };
 
         case "lvgl_roller":
+            let rollerOptions = p.options || "";
+            if (Array.isArray(rollerOptions)) {
+                rollerOptions = rollerOptions.map(String);
+            } else {
+                rollerOptions = String(rollerOptions).split("\n").filter(o => o.trim() !== "");
+            }
             return {
                 roller: {
                     ...common,
-                    options: (p.options || "").split("\n").filter(o => o.trim() !== ""),
+                    options: rollerOptions,
                     visible_row_count: p.visible_row_count,
                     bg_color: convertColor(p.bg_color),
                     text_color: convertColor(p.color),
                     selected: {
                         bg_color: convertColor(p.selected_bg_color),
                         text_color: convertColor(p.selected_text_color)
-                    }
+                    },
+                    mode: p.mode,
+                    opa: p.opa
                 }
             };
 
@@ -569,7 +716,8 @@ function transpileToLVGL(w, profile) {
                     range_to: p.max,
                     digits: p.digit_count,
                     step: p.step,
-                    value: p.value
+                    value: p.value,
+                    opa: p.opa
                 }
             };
 
@@ -584,7 +732,8 @@ function transpileToLVGL(w, profile) {
                     },
                     knob: {
                         bg_color: convertColor(p.knob_color)
-                    }
+                    },
+                    opa: p.opa
                 }
             };
 
@@ -609,7 +758,10 @@ function transpileToLVGL(w, profile) {
                     placeholder_text: `"${p.placeholder || ''}"`,
                     text: `"${p.text || ''}"`,
                     one_line: p.one_line,
-                    max_length: p.max_length || undefined
+                    max_length: p.max_length || undefined,
+                    password_mode: p.password_mode || undefined,
+                    accepted_chars: p.accepted_chars ? `"${p.accepted_chars}"` : undefined,
+                    opa: p.opa
                 }
             };
 

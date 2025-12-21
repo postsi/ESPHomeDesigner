@@ -26,8 +26,12 @@ class StateStore {
                 manual_refresh_only: false,
                 deep_sleep_enabled: false,
                 deep_sleep_interval: 600,
-                deep_sleep_interval: 600,
+                daily_refresh_enabled: false,
+                daily_refresh_time: "08:00",
+                no_refresh_start_hour: null,
+                no_refresh_end_hour: null,
                 editor_light_mode: false,
+                grid_opacity: 8,
                 device_model: "reterminal_e1001" // Ensure it's in settings too for consistency
             },
 
@@ -196,6 +200,8 @@ class StateStore {
 
     setDeviceModel(model) {
         this.state.deviceModel = model;
+        // Sync global for canvas rounding logic
+        window.currentDeviceModel = model;
         emit(EVENTS.SETTINGS_CHANGED, { deviceModel: model });
         this.updateLayoutIndicator();
     }
@@ -236,8 +242,8 @@ class StateStore {
     }
 
     setZoomLevel(level) {
-        // Clamp zoom level between 25% and 200%
-        this.state.zoomLevel = Math.max(0.25, Math.min(2.0, level));
+        // Clamp zoom level between 10% and 300%
+        this.state.zoomLevel = Math.max(0.1, Math.min(3.0, level));
         emit(EVENTS.ZOOM_CHANGED, { zoomLevel: this.state.zoomLevel });
     }
 

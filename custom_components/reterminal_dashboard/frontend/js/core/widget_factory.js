@@ -292,6 +292,17 @@ class WidgetFactory {
                 };
                 break;
 
+            case "touch_area":
+                widget.props = {
+                    title: "Touch Area",
+                    color: "rgba(0, 0, 255, 0.2)",
+                    border_color: "#0000ff"
+                };
+                // Default size
+                widget.width = 100;
+                widget.height = 100;
+                break;
+
             case "lvgl_button":
                 widget.width = 100;
                 widget.height = 40;
@@ -300,7 +311,8 @@ class WidgetFactory {
                     color: defaultColor,
                     bg_color: defaultBgColor,
                     border_width: 2,
-                    radius: 5
+                    radius: 5,
+                    opa: 255
                 };
                 break;
 
@@ -313,7 +325,10 @@ class WidgetFactory {
                     value: 50,
                     color: defaultColor,
                     title: "Arc",
-                    thickness: 10
+                    thickness: 10,
+                    start_angle: 135,
+                    end_angle: 45,
+                    mode: "NORMAL"
                 };
                 break;
 
@@ -325,7 +340,10 @@ class WidgetFactory {
                     max: 100,
                     color: defaultColor,
                     title: "Chart",
-                    type: "LINE" // LINE or SCATTER
+                    type: "LINE", // LINE or SCATTER
+                    point_count: 10,
+                    x_div_lines: 3,
+                    y_div_lines: 3
                 };
                 break;
 
@@ -362,7 +380,9 @@ class WidgetFactory {
                     value: 50,
                     color: defaultColor, // Main color
                     bg_color: "gray", // Background color
-                    range_mode: false
+                    range_mode: false,
+                    start_value: 0,
+                    mode: "NORMAL"
                 };
                 break;
 
@@ -375,7 +395,8 @@ class WidgetFactory {
                     value: 30,
                     color: defaultColor,
                     bg_color: "gray",
-                    border_width: 2
+                    border_width: 2,
+                    mode: "NORMAL"
                 };
                 break;
             case "calendar":
@@ -465,7 +486,9 @@ class WidgetFactory {
                 widget.props = {
                     options: "Option 1\nOption 2\nOption 3",
                     selected_index: 0,
-                    color: defaultColor
+                    color: defaultColor,
+                    direction: "DOWN",
+                    max_height: 200
                 };
                 break;
 
@@ -487,7 +510,8 @@ class WidgetFactory {
                     color: defaultColor,
                     bg_color: defaultBgColor,
                     selected_bg_color: "blue",
-                    selected_text_color: "white"
+                    selected_text_color: "white",
+                    mode: "NORMAL"
                 };
                 break;
 
@@ -522,7 +546,48 @@ class WidgetFactory {
                     text: "",
                     placeholder: "Enter text here...",
                     one_line: false,
-                    max_length: 0
+                    max_length: 0,
+                    password_mode: false,
+                    accepted_chars: ""
+                };
+                break;
+
+            case "lvgl_label":
+                widget.width = 120;
+                widget.height = 40;
+                widget.props = {
+                    text: "Label",
+                    font_size: 20,
+                    font_family: "Roboto",
+                    color: defaultColor,
+                    bg_color: "transparent",
+                    text_align: "CENTER"
+                };
+                break;
+
+            case "lvgl_line":
+                widget.width = 100;
+                widget.height = 50;
+                widget.props = {
+                    points: "0,25 50,10 100,25", // Format: x1,y1 x2,y2 x3,y3 ...
+                    line_width: 3,
+                    line_color: defaultColor,
+                    line_rounded: true
+                };
+                break;
+
+            case "lvgl_meter":
+                widget.width = 150;
+                widget.height = 150;
+                widget.props = {
+                    min: 0,
+                    max: 100,
+                    value: 60,
+                    color: defaultColor,
+                    indicator_color: "red",
+                    tick_count: 11,
+                    tick_length: 10,
+                    label_gap: 10
                 };
                 break;
 

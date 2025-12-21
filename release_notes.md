@@ -3,6 +3,53 @@
 
 
 
+
+## v0.8.0 - Enhanced UI & Modular Profiles
+
+**Release Date:** December 20, 2025
+
+### 🎉 New Features
+- **Modern Canvas Interaction**: Complete overhaul of canvas navigation. Now you can use the mouse wheel to zoom into the canvas or drag-move the canvas with the middle mouse button.
+- **Drag & Drop Workflow**: Widgets in the sidebar can now be dragged directly onto the canvas for intuitive placement, in addition to being clickable.
+- **RGB Color Picker**: Added a full RGB color picker for LVGL widgets, allowing for more precise UI design.
+- **Interactive Touch Icons**: The `touch_area` widget now supports dual-state icons (Normal/Pressed). This allows for professional-looking buttons on non-LVGL displays that provide visual feedback when touched.
+- **Touch Area Migration**: The `touch_area` widget has been migrated to the modern Feature Registry system, fixing console warnings and improving performance.
+- **Advanced Icon Pickers**: A completely refactored icon selection UI featuring a quick-search visual dropdown and a full modal browser for the entire Material Design Icons library.
+- **High-Fidelity Canvas Feedback**: Added color accuracy to the canvas preview and an interactive hover effect. Hovering over a touch area now simulates the "pressed" state, allowing you to preview interactions instantly.
+- **Border Styling**: Added the possibility to apply border colors for squares and circles.
+- **Hardware Recipes & Templates**:
+    - **Dynamic Discovery**: Drop a YAML file into `frontend/hardware/` and it will automatically appear in the device selector.
+    - **Dynamic Import (GUI)**: Click **"Import Recipe"** in the Device Settings to upload a new template directly through the browser.
+    - **Offline Manual Import**: Added support for parsing YAML recipes directly in the browser when running offline.
+- **Modular Hardware Profiles**: Implemented support for loading hardware profiles from plain YAML files (package-based). This enables seamless profile sharing with the [esphome-modular-lvgl-buttons](https://github.com/agillis/esphome-modular-lvgl-buttons/) project. Big thank you to [agillis](https://github.com/agillis/) for these awesome profiles!
+
+### 🐛 Bug Fixes
+- **Date/Time Widget Improvements**:
+    - Fixed an issue where the widget would occasionally insert duplicate code into the YAML.
+    - Fixed font size property persistence so settings are correctly restored when updating layout from YAML.
+- **Fullscreen YAML Editor**: Fixed a bug where one could only click once on the full screen YAML and never again after opening it.
+- **Icon Rendering**: Fixed a bug where gray icons would result in solid squares when flashed on device due to dithering logic issues.
+- **Alignment Fixes**: Removed the legacy 15px vertical offset for shapes to ensure they render exactly where they appear on the canvas.
+- **Calendar Widget**: Various improvements to rendering, performance, and stability.
+- **Major Energy Management Overhaul**: Complete logic rewrite for better reliability and clarity.
+    - **Silent Hours (No Refresh Window)**: Added ability to disable display updates during specific hours to prevent ghosting or noise at night. Integrated with both Standard and Ultra Eco modes.
+    - **Global Interval Fix**: Fixed a bug where the refresh interval was incorrectly exported to YAML.
+- **M5Stack CoreInk Refinements**:
+    - Fixed **Dark Mode** rendering issues where the background remained white instead of black.
+    - Improved battery calibration and button logic responsiveness.
+- **Rounded Rectangles**: Improved the rendering of rounded rectangles to look much nicer when flashed to a physical device.
+- **TRMNL DIY Battery**: Fixed incorrect battery level and voltage readings for the TRMNL DIY (ESP32-S3) hardware by implementing a proper 12-point calibration curve.
+
+### 🔧 Architectural Changes
+- **Live YAML Generation**: Removed the "Generate YAML" button as it has become redundant; YAML is now generated on the fly as you design.
+- **Optimized Device List**: Cleaned up the device list, regrouped by manufacturer with clearer device names.
+- **Efficient YAML Output**: Improved the gray dither logic to produce significantly less YAML code by using C++ `for` loops.
+- **Mobile Support**: Added support for smaller screens like mobile phones, with a more responsive UI (Note: drag and drop behavior on touch devices is not yet fully tested).
+- **Hybrid Profile Solution**: Implemented a hybrid loading system. While new LCD profiles are fetched as YAML packages, legacy E-Ink profiles (M5Paper, CoreInk, TRMNL) are still served via built-in JS definitions.
+- **Online/Standalone Warning**: Note that due to browser security restrictions, package-based profiles require the application to be served via a web server (like Home Assistant) and will show a warning in the standalone offline version (`file://`).
+
+---
+
 ## v0.7.4 - Trmnl DIY Support
 
 **Release Date:** December 17, 2025
