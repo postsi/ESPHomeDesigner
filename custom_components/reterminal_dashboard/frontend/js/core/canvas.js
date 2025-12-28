@@ -132,8 +132,12 @@ class Canvas {
             el.style.height = widget.height + "px";
             el.dataset.id = widget.id;
 
-            if (widget.id === AppState.selectedWidgetId) {
+            if (AppState.selectedWidgetIds.includes(widget.id)) {
                 el.classList.add("active");
+            }
+
+            if (widget.locked) {
+                el.classList.add("locked");
             }
 
             const type = (widget.type || "").toLowerCase();
@@ -407,41 +411,87 @@ class Canvas {
     setupInteractions() {
         this.canvas.addEventListener("mousedown", (ev) => {
             if (ev.button !== 0) return; // Only handle left-click for widgets
+
             const widgetEl = ev.target.closest(".widget");
-            if (!widgetEl) return;
-
-            const widgetId = widgetEl.dataset.id;
-            AppState.selectWidget(widgetId);
-
-            const widget = AppState.getWidgetById(widgetId);
-            if (!widget) return;
-
             const rect = this.canvas.getBoundingClientRect();
             const zoom = AppState.zoomLevel;
-            const isResizeHandle = ev.target.classList.contains("widget-resize-handle");
 
-            if (isResizeHandle) {
-                this.dragState = {
-                    mode: "resize",
-                    id: widgetId,
-                    startX: ev.clientX,
-                    startY: ev.clientY,
-                    startW: widget.width,
-                    startH: widget.height
-                };
+            if (widgetEl) {
+                const widgetId = widgetEl.dataset.id;
+                const isShift = ev.shiftKey;
+
+                // If shift is held, toggle selection. Otherwise, if the clicked widget isn't already 
+                // part of the selection, make it the sole selection.
+                if (isShift) {
+                    AppState.selectWidget(widgetId, true);
+                } else if (!AppState.selectedWidgetIds.includes(widgetId)) {
+                    AppState.selectWidget(widgetId, false);
+                }
+
+                const widget = AppState.getWidgetById(widgetId);
+                if (!widget) return;
+
+                const isResizeHandle = ev.target.classList.contains("widget-resize-handle");
+
+                if (isResizeHandle) {
+                    if (widget.locked) return; // Prevent resize if locked
+                    this.dragState = {
+                        mode: "resize",
+                        id: widgetId,
+                        startX: ev.clientX,
+                        startY: ev.clientY,
+                        startW: widget.width,
+                        startH: widget.height
+                    };
+                } else {
+                    if (widget.locked) return; // Prevent move if locked
+
+                    // Capture start positions for all selected widgets
+                    const selectedWidgets = AppState.getSelectedWidgets();
+                    const widgetOffsets = selectedWidgets.map(w => ({
+                        id: w.id,
+                        startX: w.x,
+                        startY: w.y,
+                        // Offset relative to the initial click point
+                        clickOffsetX: (ev.clientX - rect.left) / zoom - w.x,
+                        clickOffsetY: (ev.clientY - rect.top) / zoom - w.y
+                    }));
+
+                    this.dragState = {
+                        mode: "move",
+                        id: widgetId,
+                        widgets: widgetOffsets
+                    };
+                }
+
+                window.addEventListener("mousemove", this._boundMouseMove);
+                window.addEventListener("mouseup", this._boundMouseUp);
+                ev.preventDefault();
             } else {
-                // Calculate offset accounting for zoom
-                this.dragState = {
-                    mode: "move",
-                    id: widgetId,
-                    offsetX: (ev.clientX - rect.left) / zoom - widget.x,
-                    offsetY: (ev.clientY - rect.top) / zoom - widget.y
-                };
-            }
+                // Clicked on canvas background - release focus from inputs (e.g. YAML box)
+                if (document.activeElement) {
+                    document.activeElement.blur();
+                }
 
-            window.addEventListener("mousemove", this._boundMouseMove);
-            window.addEventListener("mouseup", this._boundMouseUp);
-            ev.preventDefault();
+                // Clicked on canvas background - start lasso
+                const startX = (ev.clientX - rect.left) / zoom;
+                const startY = (ev.clientY - rect.top) / zoom;
+
+                this.lassoState = {
+                    startX,
+                    startY,
+                    rect: null
+                };
+
+                // Create lasso element
+                this.lassoEl = document.createElement("div");
+                this.lassoEl.className = "lasso-selection";
+                this.canvas.appendChild(this.lassoEl);
+
+                window.addEventListener("mousemove", this._boundMouseMove);
+                window.addEventListener("mouseup", this._boundMouseUp);
+                ev.preventDefault();
+            }
         });
     }
 
@@ -664,106 +714,175 @@ class Canvas {
     }
 
     _onMouseMove(ev) {
-        if (!this.dragState) return;
-
-        const widget = AppState.getWidgetById(this.dragState.id);
-        if (!widget) return;
-
-        const dims = AppState.getCanvasDimensions();
         const zoom = AppState.zoomLevel;
+        const dims = AppState.getCanvasDimensions();
 
-        if (this.dragState.mode === "move") {
+        if (this.dragState) {
+            if (this.dragState.mode === "move") {
+                const rect = this.canvas.getBoundingClientRect();
+
+                // Primary widget delta for snapping
+                const primaryWidget = AppState.getWidgetById(this.dragState.id);
+                if (!primaryWidget) return;
+
+                const primaryOffset = this.dragState.widgets.find(w => w.id === this.dragState.id);
+
+                let targetX = (ev.clientX - rect.left) / zoom - primaryOffset.clickOffsetX;
+                let targetY = (ev.clientY - rect.top) / zoom - primaryOffset.clickOffsetY;
+
+                // Snap logic using the primary widget
+                const page = AppState.getCurrentPage();
+                if (page?.layout && !ev.altKey) {
+                    const snappedToGrid = this._snapToGridCell(targetX, targetY, primaryWidget.width, primaryWidget.height, page.layout, dims);
+                    targetX = snappedToGrid.x;
+                    targetY = snappedToGrid.y;
+                } else {
+                    const snapped = this.applySnapToPosition(primaryWidget, targetX, targetY, ev.altKey, dims);
+                    targetX = snapped.x;
+                    targetY = snapped.y;
+                }
+
+                // Calculate displacement based on snapped target
+                const dx = targetX - primaryOffset.startX;
+                const dy = targetY - primaryOffset.startY;
+
+                // Move all selected widgets by the same displacement
+                for (const wInfo of this.dragState.widgets) {
+                    const widget = AppState.getWidgetById(wInfo.id);
+                    if (widget && !widget.locked) {
+                        widget.x = wInfo.startX + dx;
+                        widget.y = wInfo.startY + dy;
+                    }
+                }
+            } else if (this.dragState.mode === "resize") {
+                const widget = AppState.getWidgetById(this.dragState.id);
+                if (!widget) return;
+
+                let w = this.dragState.startW + (ev.clientX - this.dragState.startX) / zoom;
+                let h = this.dragState.startH + (ev.clientY - this.dragState.startY) / zoom;
+
+                const wtype = (widget.type || "").toLowerCase();
+
+                if (wtype === "line" || wtype === "lvgl_line") {
+                    const props = widget.props || {};
+                    const orientation = props.orientation || "horizontal";
+                    const strokeWidth = parseInt(props.stroke_width || props.line_width || 3, 10);
+
+                    if (orientation === "vertical") {
+                        w = strokeWidth;
+                        h = Math.max(10, h);
+                    } else {
+                        h = strokeWidth;
+                        w = Math.max(10, w);
+                    }
+                }
+
+                const minSize = 1;
+                w = Math.max(minSize, Math.min(dims.width - widget.x, w));
+                h = Math.max(minSize, Math.min(dims.height - widget.y, h));
+                widget.width = Math.round(w);
+                widget.height = Math.round(h);
+
+                if (wtype === "icon" || wtype === "weather_icon" || wtype === "battery_icon" || wtype === "wifi_signal") {
+                    const props = widget.props || {};
+                    if (props.fit_icon_to_frame) {
+                        const padding = 4;
+                        const maxDim = Math.max(8, Math.min(widget.width - padding * 2, widget.height - padding * 2));
+                        props.size = Math.round(maxDim);
+                    } else {
+                        const newSize = Math.max(8, Math.min(widget.width, widget.height));
+                        props.size = Math.round(newSize);
+                    }
+                } else if (wtype === "shape_circle") {
+                    const size = Math.max(widget.width, widget.height);
+                    widget.width = size;
+                    widget.height = size;
+                }
+            }
+            this.render();
+        } else if (this.lassoState) {
             const rect = this.canvas.getBoundingClientRect();
-            // Account for zoom when calculating position
-            let x = (ev.clientX - rect.left) / zoom - this.dragState.offsetX;
-            let y = (ev.clientY - rect.top) / zoom - this.dragState.offsetY;
+            const currentX = (ev.clientX - rect.left) / zoom;
+            const currentY = (ev.clientY - rect.top) / zoom;
 
-            x = Math.max(0, Math.min(dims.width - widget.width, x));
-            y = Math.max(0, Math.min(dims.height - widget.height, y));
+            const x = Math.min(this.lassoState.startX, currentX);
+            const y = Math.min(this.lassoState.startY, currentY);
+            const w = Math.abs(currentX - this.lassoState.startX);
+            const h = Math.abs(currentY - this.lassoState.startY);
 
-            // Snap to grid cells if page has grid layout (unless Alt held)
-            const page = AppState.getCurrentPage();
-            if (page?.layout && !ev.altKey) {
-                const snappedToGrid = this._snapToGridCell(x, y, widget.width, widget.height, page.layout, dims);
-                x = snappedToGrid.x;
-                y = snappedToGrid.y;
-            } else {
-                const snapped = this.applySnapToPosition(widget, x, y, ev.altKey, dims);
-                x = snapped.x;
-                y = snapped.y;
-            }
+            this.lassoState.rect = { x, y, w, h };
 
-            widget.x = x;
-            widget.y = y;
-        } else if (this.dragState.mode === "resize") {
-            // Account for zoom when calculating resize delta
-            let w = this.dragState.startW + (ev.clientX - this.dragState.startX) / zoom;
-            let h = this.dragState.startH + (ev.clientY - this.dragState.startY) / zoom;
-
-            const wtype = (widget.type || "").toLowerCase();
-
-            // Special handling for line widgets - allow resizing along the line direction
-            if (wtype === "line" || wtype === "lvgl_line") {
-                const props = widget.props || {};
-                const orientation = props.orientation || "horizontal";
-                const strokeWidth = parseInt(props.stroke_width || props.line_width || 3, 10);
-
-                if (orientation === "vertical") {
-                    // Vertical line: height is the length (resizable), width stays as stroke_width
-                    w = strokeWidth;
-                    // Enforce minimum height
-                    h = Math.max(10, h);
-                } else {
-                    // Horizontal line: width is the length (resizable), height stays as stroke_width
-                    h = strokeWidth;
-                    // Enforce minimum width
-                    w = Math.max(10, w);
-                }
-            }
-
-            // Clamp to canvas bounds
-            const minSize = 1;
-            w = Math.max(minSize, Math.min(dims.width - widget.x, w));
-            h = Math.max(minSize, Math.min(dims.height - widget.y, h));
-            widget.width = Math.round(w);
-            widget.height = Math.round(h);
-
-            // Special handling for icons
-            if (wtype === "icon" || wtype === "weather_icon" || wtype === "battery_icon" || wtype === "wifi_signal") {
-
-                const props = widget.props || {};
-                if (props.fit_icon_to_frame) {
-                    const padding = 4;
-                    const maxDim = Math.max(8, Math.min(widget.width - padding * 2, widget.height - padding * 2));
-                    props.size = Math.round(maxDim);
-                } else {
-                    const newSize = Math.max(8, Math.min(widget.width, widget.height));
-                    props.size = Math.round(newSize);
-                }
-            } else if (wtype === "shape_circle") {
-                const size = Math.max(widget.width, widget.height);
-                widget.width = size;
-                widget.height = size;
+            if (this.lassoEl) {
+                this.lassoEl.style.left = x + "px";
+                this.lassoEl.style.top = y + "px";
+                this.lassoEl.style.width = w + "px";
+                this.lassoEl.style.height = h + "px";
             }
         }
-
-        this.render();
     }
 
-    _onMouseUp() {
+    _onMouseUp(ev) {
         if (this.dragState) {
-            const widgetId = this.dragState.id;  // Property is named 'id' in dragState
+            const widgetId = this.dragState.id;
             this.dragState = null;
             this.clearSnapGuides();
             window.removeEventListener("mousemove", this._boundMouseMove);
             window.removeEventListener("mouseup", this._boundMouseUp);
 
-            // Auto-detect grid cell position if page has grid layout
             this._updateWidgetGridCell(widgetId);
 
-            // Trigger state update to save history
             AppState.recordHistory();
             emit(EVENTS.STATE_CHANGED);
+            this.render();
+        } else if (this.lassoState) {
+            window.removeEventListener("mousemove", this._boundMouseMove);
+            window.removeEventListener("mouseup", this._boundMouseUp);
+
+            if (this.lassoEl) {
+                this.lassoEl.remove();
+                this.lassoEl = null;
+            }
+
+            if (this.lassoState.rect) {
+                const { x, y, w, h } = this.lassoState.rect;
+                const page = AppState.getCurrentPage();
+                const selectedIds = [];
+
+                if (page) {
+                    for (const widget of page.widgets) {
+                        // Check if widget bounds intersect with lasso rect
+                        const widgetRect = {
+                            x1: widget.x,
+                            y1: widget.y,
+                            x2: widget.x + widget.width,
+                            y2: widget.y + widget.height
+                        };
+
+                        const lassoRect = {
+                            x1: x,
+                            y1: y,
+                            x2: x + w,
+                            y2: y + h
+                        };
+
+                        const intersects = !(widgetRect.x2 < lassoRect.x1 ||
+                            widgetRect.x1 > lassoRect.x2 ||
+                            widgetRect.y2 < lassoRect.y1 ||
+                            widgetRect.y1 > lassoRect.y2);
+
+                        if (intersects) {
+                            selectedIds.push(widget.id);
+                        }
+                    }
+                }
+
+                AppState.selectWidgets(selectedIds);
+            } else {
+                // Clicked without dragging - clear selection
+                AppState.selectWidgets([]);
+            }
+
+            this.lassoState = null;
             this.render();
         }
     }

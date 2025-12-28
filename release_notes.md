@@ -1,5 +1,33 @@
 # Release Notes
 
+## v0.8.3 - Mobile Touch & Hardware Fixes
+
+**Release Date:** December 28, 2025
+
+### 🎉 New Features
+- **Widget Position Locking:** Added a "Lock Position" checkbox to widget properties, preventing accidental movement or resizing on the canvas.
+- **Full Touch Support**: Added comprehensive support for dragging, resizing, and moving widgets on touch devices (mobile phones/tablets). Pinch-to-zoom and panning are also optimized for mobile browsers.
+- **Standardized SHT Sensor Support**: Enhanced support for SHT3x, SHT4x, and SHTC3 sensors with standardized internal IDs, ensuring compatibility across M5 Paper and other hardware.
+- **Default Home Assistant Icon**: Set the default MDI icon for the "icon" widget to the Home Assistant icon (`F07D0`).
+- **Lasso Selection**: Added ability to select multiple widgets simultaneously by drawing a selection rectangle on the canvas. Supports group movement, bulk deletion, and multi-widget copy/paste.
+- **Auto Page Cycling:** Added support for automatic page switching based on a configurable time interval, perfect for kiosk-style displays. Includes logic to reset the timer on manual user interaction.
+- **Navigation Touch Widgets:** Introduced "Next Page", "Previous Page", and "Reload Page" widgets in the Inputs category. These are pre-configured touch areas that automatically generate the required ESPHome scripts for seamless multi-page navigation and display refreshing.
+- **Global Variable Refresh Interval**: Users can now configure a global default refresh interval for the entire device. This setting intelligently syncs with Deep Sleep intervals and ensures consistent refresh timing across all pages while preserving battery life. Provisions were made to ensure this setting is persistent across page refreshes and exports.
+- **Enhanced Quick Widget Search (Shift+Space)**: The Quick Search command is now global! Pressing `Shift+Space` will now open the widget picker even if you are editing text in the YAML box or properties panel, automatically blurring the input and letting you add widgets instantly.
+- **Enhanced YAML Copy Feedback**: The "Copy" button in the YAML editor now provides immediate visual feedback ("Copied!") on click, confirming the action without needing to look at toast notifications.
+
+### 🐛 Bug Fixes
+- **YAML Syntax Error**: Fixed "mapping values are not allowed here" error by switching widget marker comments from `//` to standard YAML `#` notation. Maintained full backwards compatibility for importing existing local projects.
+- **M5 Paper Temp/Humidity Widgets**: Fixed Temperature and Humidity widgets on M5 Paper by implementing `sht3xd` platform support.
+- **YAML Cleanup**: Eliminated redundant/duplicate sensor blocks in generated YAML for devices with on-board sensors.
+- **Icon Character Escaping**: Fixed a bug where certain unicode icons (like `thermometer-low`) were improperly escaped in the generated C++ code.
+- **UI Refinement**: Updated the properties panel to be more sensor-agnostic and refined various labels for better clarity.
+- **YAML Duplication**: Fixed a critical bug where hardware recipes (like Xiao ePaper) were duplicated in the output and had incorrect lambda nesting, causing compilation errors.
+
+
+---
+
+
 ## v0.8.2 - AI Assistant & Secure API
 
 **Release Date:** December 26, 2025

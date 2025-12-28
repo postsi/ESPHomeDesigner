@@ -205,10 +205,24 @@ class App {
                 if (!snippetBox) return;
 
                 const text = snippetBox.value || "";
+
+                const originalText = copySnippetBtn.textContent;
+                const setSuccessState = () => {
+                    copySnippetBtn.textContent = "Copied!";
+                    copySnippetBtn.style.minWidth = copySnippetBtn.offsetWidth + "px"; // Prevent layout jump
+
+                    // Revert after 2 seconds
+                    setTimeout(() => {
+                        copySnippetBtn.textContent = originalText;
+                        copySnippetBtn.style.minWidth = "";
+                    }, 2000);
+                };
+
                 try {
                     if (navigator.clipboard && window.isSecureContext) {
                         await navigator.clipboard.writeText(text);
                         showToast("Snippet copied to clipboard", "success");
+                        setSuccessState();
                     } else {
                         // Fallback for non-secure contexts
                         const textarea = document.createElement("textarea");
@@ -222,6 +236,7 @@ class App {
                         try {
                             document.execCommand("copy");
                             showToast("Snippet copied to clipboard", "success");
+                            setSuccessState();
                         } catch {
                             showToast("Unable to copy. Try selecting and copying manually.", "error");
                         }

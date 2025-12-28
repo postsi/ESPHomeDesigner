@@ -602,9 +602,22 @@ textarea:focus {
   touch-action: none;
 }
 
+.widget.locked {
+  cursor: default;
+}
+
+.widget.locked .widget-resize-handle {
+  display: none;
+}
+
 .widget.active {
   outline: 2px solid var(--accent);
   box-shadow: 0 0 0 2px rgba(82, 199, 234, 0.4);
+}
+
+.widget.active.locked {
+  outline: 2px solid var(--danger);
+  box-shadow: 0 0 0 2px rgba(255, 107, 129, 0.4);
 }
 
 .widget-resize-handle {
@@ -651,6 +664,14 @@ textarea:focus {
   height: 1px;
   left: 0;
   right: 0;
+}
+
+.lasso-selection {
+  position: absolute;
+  border: 1px dashed var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+  z-index: 1000;
 }
 
 /* Long-press visual feedback removed - replaced by Select-First interaction */

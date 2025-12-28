@@ -8,8 +8,8 @@ class StateStore {
         this.state = {
             pages: [],
             currentPageIndex: 0,
-            selectedWidgetId: null,
-            clipboardWidget: null,
+            selectedWidgetIds: [],
+            clipboardWidgets: [],
 
             // Current layout ID (for multi-layout support)
             currentLayoutId: "reterminal_e1001",
@@ -41,7 +41,10 @@ class StateStore {
                 ai_model_openai: "gpt-4o",
                 ai_model_openrouter: "",
                 ai_model_filter: "",
-                extended_latin_glyphs: false // Enable GF_Latin_Core glyphset for diacritics (ľščťž, etc.)
+                extended_latin_glyphs: false, // Enable GF_Latin_Core glyphset for diacritics (ľščťž, etc.)
+                auto_cycle_enabled: false,
+                auto_cycle_interval_s: 30,
+                refresh_interval: 600
             },
 
             // Editor State
@@ -91,7 +94,8 @@ class StateStore {
 
     get pages() { return this.state.pages; }
     get currentPageIndex() { return this.state.currentPageIndex; }
-    get selectedWidgetId() { return this.state.selectedWidgetId; }
+    get selectedWidgetId() { return this.state.selectedWidgetIds[0] || null; }
+    get selectedWidgetIds() { return this.state.selectedWidgetIds; }
     get settings() { return this.state.settings; }
     get deviceName() { return this.state.deviceName; }
     get deviceModel() { return this.state.deviceModel; }
@@ -109,7 +113,11 @@ class StateStore {
     }
 
     getSelectedWidget() {
-        return this.state.selectedWidgetId ? this.getWidgetById(this.state.selectedWidgetId) : null;
+        return this.state.selectedWidgetIds.length > 0 ? this.getWidgetById(this.state.selectedWidgetIds[0]) : null;
+    }
+
+    getSelectedWidgets() {
+        return this.state.selectedWidgetIds.map(id => this.getWidgetById(id)).filter(w => !!w);
     }
 
     getCanvasDimensions() {
@@ -270,15 +278,29 @@ class StateStore {
     setCurrentPageIndex(index) {
         if (index >= 0 && index < this.state.pages.length) {
             this.state.currentPageIndex = index;
-            this.state.selectedWidgetId = null; // Deselect on page change
+            this.state.selectedWidgetIds = []; // Deselect on page change
             emit(EVENTS.PAGE_CHANGED, { index });
-            emit(EVENTS.SELECTION_CHANGED, { widgetId: null });
+            emit(EVENTS.SELECTION_CHANGED, { widgetIds: [] });
         }
     }
 
-    selectWidget(widgetId) {
-        this.state.selectedWidgetId = widgetId;
-        emit(EVENTS.SELECTION_CHANGED, { widgetId });
+    selectWidget(widgetId, multi = false) {
+        if (multi) {
+            const idx = this.state.selectedWidgetIds.indexOf(widgetId);
+            if (idx === -1) {
+                if (widgetId) this.state.selectedWidgetIds.push(widgetId);
+            } else {
+                this.state.selectedWidgetIds.splice(idx, 1);
+            }
+        } else {
+            this.state.selectedWidgetIds = widgetId ? [widgetId] : [];
+        }
+        emit(EVENTS.SELECTION_CHANGED, { widgetIds: this.state.selectedWidgetIds });
+    }
+
+    selectWidgets(widgetIds) {
+        this.state.selectedWidgetIds = widgetIds || [];
+        emit(EVENTS.SELECTION_CHANGED, { widgetIds: this.state.selectedWidgetIds });
     }
 
     updateSettings(newSettings) {
@@ -370,64 +392,81 @@ class StateStore {
     }
 
     deleteWidget(widgetId) {
+        const idsToDelete = (widgetId && !this.state.selectedWidgetIds.includes(widgetId))
+            ? [widgetId]
+            : [...this.state.selectedWidgetIds];
+
+        if (idsToDelete.length === 0) return;
+
         const page = this.getCurrentPage();
-        const idx = page.widgets.findIndex(w => w.id === widgetId);
-        if (idx !== -1) {
-            page.widgets.splice(idx, 1);
-            this.state.widgetsById.delete(widgetId);
-            if (this.state.selectedWidgetId === widgetId) {
-                this.selectWidget(null);
+        let changed = false;
+
+        for (const id of idsToDelete) {
+            const idx = page.widgets.findIndex(w => w.id === id);
+            if (idx !== -1) {
+                page.widgets.splice(idx, 1);
+                this.state.widgetsById.delete(id);
+                changed = true;
             }
+        }
+
+        if (changed) {
+            this.state.selectedWidgetIds = [];
             this.recordHistory();
             emit(EVENTS.STATE_CHANGED);
+            emit(EVENTS.SELECTION_CHANGED, { widgetIds: [] });
         }
     }
 
     copyWidget() {
-        if (this.state.selectedWidgetId) {
-            const widget = this.getWidgetById(this.state.selectedWidgetId);
-            if (widget) {
-                this.state.clipboardWidget = deepClone(widget);
-                console.log("Copied widget:", this.state.clipboardWidget);
-            }
+        if (this.state.selectedWidgetIds.length > 0) {
+            this.state.clipboardWidgets = this.getSelectedWidgets().map(w => deepClone(w));
+            console.log("Copied widgets:", this.state.clipboardWidgets.length);
         }
     }
 
     pasteWidget() {
-        if (this.state.clipboardWidget) {
-            const newWidget = deepClone(this.state.clipboardWidget);
-            newWidget.id = "w_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-
-            // Initial offset
-            newWidget.x += 20;
-            newWidget.y += 20;
-
-            // Smart Cascade: Prevent exact overlap with existing widgets
+        if (this.state.clipboardWidgets && this.state.clipboardWidgets.length > 0) {
+            const newIds = [];
             const page = this.getCurrentPage();
-            let attempts = 0;
-            const maxAttempts = 50;
+            const dims = this.getCanvasDimensions();
 
-            while (attempts < maxAttempts) {
-                // Check for intersection with any existing widget (using a small threshold for "same spot")
-                // We use a small tolerance (e.g. 5px) to detect "basically on top of each other"
-                const collision = page.widgets.some(w =>
-                    Math.abs(w.x - newWidget.x) < 10 && Math.abs(w.y - newWidget.y) < 10
-                );
+            for (const copiedWidget of this.state.clipboardWidgets) {
+                const newWidget = deepClone(copiedWidget);
+                newWidget.id = "w_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_" + Math.floor(Math.random() * 100);
 
-                if (!collision) break;
-
-                // Shift down-right if occupied
+                // Initial offset
                 newWidget.x += 20;
                 newWidget.y += 20;
-                attempts++;
+
+                // Smart Cascade: Prevent exact overlap with existing widgets
+                let attempts = 0;
+                const maxAttempts = 50;
+
+                while (attempts < maxAttempts) {
+                    const collision = page.widgets.some(w =>
+                        Math.abs(w.x - newWidget.x) < 10 && Math.abs(w.y - newWidget.y) < 10
+                    );
+                    if (!collision) break;
+                    newWidget.x += 20;
+                    newWidget.y += 20;
+                    attempts++;
+                }
+
+                // Ensure it fits on canvas
+                if (newWidget.x + newWidget.width > dims.width) newWidget.x = Math.max(0, dims.width - newWidget.width);
+                if (newWidget.y + newWidget.height > dims.height) newWidget.y = Math.max(0, dims.height - newWidget.height);
+
+                page.widgets.push(newWidget);
+                this.state.widgetsById.set(newWidget.id, newWidget);
+                newIds.push(newWidget.id);
             }
 
-            // Ensure it fits on canvas
-            const dims = this.getCanvasDimensions();
-            if (newWidget.x + newWidget.width > dims.width) newWidget.x = Math.max(0, dims.width - newWidget.width);
-            if (newWidget.y + newWidget.height > dims.height) newWidget.y = Math.max(0, dims.height - newWidget.height);
-
-            this.addWidget(newWidget);
+            if (newIds.length > 0) {
+                this.recordHistory();
+                emit(EVENTS.STATE_CHANGED);
+                this.selectWidgets(newIds);
+            }
         }
     }
 
@@ -495,8 +534,9 @@ class StateStore {
             this.state.currentPageIndex = 0;
         }
 
-        this.selectWidget(null);
+        this.state.selectedWidgetIds = [];
         emit(EVENTS.STATE_CHANGED);
+        emit(EVENTS.SELECTION_CHANGED, { widgetIds: [] });
         emit(EVENTS.HISTORY_CHANGED, { canUndo: this.canUndo(), canRedo: this.canRedo() });
     }
 

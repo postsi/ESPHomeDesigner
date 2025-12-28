@@ -249,7 +249,10 @@ window.DEVICE_PROFILES = {
     name: "M5Paper (540x960)",
     displayModel: "M5Paper",
     displayPlatform: "it8951e",
-    resolution: { width: 540, height: 960 },
+    // NOTE: The IT8951E external component (Passific/m5paper_esphome) 
+    // internally uses 960x540 as its panel dimensions, treating the device
+    // as landscape-native. We match this here so rotation calculations work correctly.
+    resolution: { width: 960, height: 540 },
     shape: "rect",
     features: {
       psram: true,
@@ -258,7 +261,8 @@ window.DEVICE_PROFILES = {
       lcd: false,
       epaper: true,
       touch: true, // Has GT911
-      inverted_colors: true
+      inverted_colors: true,
+      sht3x: true
     },
     pins: {
       display: { cs: "GPIO15", dc: null, reset: "GPIO23", busy: "GPIO27" }, // DC not used for IT8951E
@@ -288,7 +292,8 @@ window.DEVICE_PROFILES = {
       interrupt_pin: "GPIO36",
       update_interval: "never", // Interrupt used
       transform: { mirror_x: false, mirror_y: false, swap_xy: false },
-      calibration: { x_min: 0, x_max: 540, y_min: 0, y_max: 960 }
+      // Calibration matches the IT8951E component's 960x540 coordinate space
+      calibration: { x_min: 0, x_max: 960, y_min: 0, y_max: 540 }
     },
     external_components: [
       "  - source: github://Passific/m5paper_esphome"

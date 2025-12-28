@@ -328,11 +328,27 @@ function generateSensorSection(profile, widgetSensorLines = [], displayId = "my_
     // 2. SHT4x (Temperature/Humidity)
     if (hasSht4x) {
         lines.push("  - platform: sht4x");
+        lines.push("    id: sht4x_sensor");
         lines.push("    temperature:");
         lines.push("      name: \"Temperature\"");
+        lines.push("      id: sht4x_temperature");
         lines.push("    humidity:");
         lines.push("      name: \"Humidity\"");
+        lines.push("      id: sht4x_humidity");
         lines.push("    address: 0x44");
+        lines.push("    update_interval: 60s");
+    }
+
+    // 2b. SHT3x (Temperature/Humidity) - M5Paper
+    if (profile.features.sht3x) {
+        lines.push("  - platform: sht3xd");
+        lines.push("    address: 0x44");
+        lines.push("    temperature:");
+        lines.push("      name: \"Temperature\"");
+        lines.push("      id: sht3x_temperature");
+        lines.push("    humidity:");
+        lines.push("      name: \"Humidity\"");
+        lines.push("      id: sht3x_humidity");
         lines.push("    update_interval: 60s");
     }
 
@@ -344,8 +360,10 @@ function generateSensorSection(profile, widgetSensorLines = [], displayId = "my_
         lines.push("    address: 0x70");
         lines.push("    temperature:");
         lines.push("      name: \"Temperature\"");
+        lines.push("      id: shtc3_temperature");
         lines.push("    humidity:");
         lines.push("      name: \"Humidity\"");
+        lines.push("      id: shtc3_humidity");
         lines.push("    update_interval: 60s");
     }
 
@@ -426,20 +444,15 @@ function generateBinarySensorSection(profile, numPages, displayId = "my_display"
             lines.push("      then:");
             if (isCoreInk) {
                 // CoreInk: Simple page change with activity timer reset
-                lines.push(`        - lambda: 'if (id(display_page) > 0) id(display_page) -= 1; else id(display_page) = ${numPages - 1};'`);
-                lines.push(`        - component.update: ${displayId}`);
+                lines.push("        - script.execute:");
+                lines.push("            id: change_page_to");
+                lines.push(`            target_page: !lambda 'return id(display_page) > 0 ? id(display_page) - 1 : ${numPages - 1};'`);
                 lines.push("        - script.stop: activity_timer");
                 lines.push("        - script.execute: activity_timer");
             } else {
-                lines.push("        - if:");
-                lines.push("            condition:");
-                lines.push("              lambda: 'return id(display_page) > 0;'");
-                lines.push("            then:");
-                lines.push("              - lambda: 'id(display_page) -= 1;'");
-                lines.push(`              - component.update: ${displayId}`);
-                lines.push("            else:");
-                lines.push(`              - lambda: 'id(display_page) = ${numPages - 1};'`);
-                lines.push(`              - component.update: ${displayId}`);
+                lines.push("        - script.execute:");
+                lines.push("            id: change_page_to");
+                lines.push(`            target_page: !lambda 'return id(display_page) > 0 ? id(display_page) - 1 : ${numPages - 1};'`);
             }
         }
 
@@ -461,20 +474,15 @@ function generateBinarySensorSection(profile, numPages, displayId = "my_display"
             lines.push("      then:");
             if (isCoreInk) {
                 // CoreInk: Simple page change with activity timer reset
-                lines.push(`        - lambda: 'if (id(display_page) < ${numPages - 1}) id(display_page) += 1; else id(display_page) = 0;'`);
-                lines.push(`        - component.update: ${displayId}`);
+                lines.push("        - script.execute:");
+                lines.push("            id: change_page_to");
+                lines.push(`            target_page: !lambda 'return id(display_page) < ${numPages - 1} ? id(display_page) + 1 : 0;'`);
                 lines.push("        - script.stop: activity_timer");
                 lines.push("        - script.execute: activity_timer");
             } else {
-                lines.push("        - if:");
-                lines.push(`            condition:`);
-                lines.push(`              lambda: 'return id(display_page) < ${numPages - 1};'`);
-                lines.push("            then:");
-                lines.push("              - lambda: 'id(display_page) += 1;'");
-                lines.push(`              - component.update: ${displayId}`);
-                lines.push("            else:");
-                lines.push("              - lambda: 'id(display_page) = 0;'");
-                lines.push(`              - component.update: ${displayId}`);
+                lines.push("        - script.execute:");
+                lines.push("            id: change_page_to");
+                lines.push(`            target_page: !lambda 'return id(display_page) < ${numPages - 1} ? id(display_page) + 1 : 0;'`);
             }
         }
 
@@ -514,6 +522,7 @@ function generateBinarySensorSection(profile, numPages, displayId = "my_display"
             const xMax = w.x + w.width;
             const yMin = w.y;
             const yMax = w.y + w.height;
+            const navAction = w.props?.nav_action || "none";
 
             lines.push(`  - platform: touchscreen`);
             lines.push(`    id: ${safeId}`);
@@ -522,6 +531,29 @@ function generateBinarySensorSection(profile, numPages, displayId = "my_display"
             lines.push(`    x_max: ${xMax}`);
             lines.push(`    y_min: ${yMin}`);
             lines.push(`    y_max: ${yMax}`);
+
+            // Generate on_press action based on nav_action
+            if (navAction === "next_page") {
+                lines.push(`    on_press:`);
+                lines.push(`      - script.execute:`);
+                lines.push(`          id: change_page_to`);
+                lines.push(`          target_page: !lambda 'return id(display_page) + 1;'`);
+            } else if (navAction === "previous_page") {
+                lines.push(`    on_press:`);
+                lines.push(`      - script.execute:`);
+                lines.push(`          id: change_page_to`);
+                lines.push(`          target_page: !lambda 'return id(display_page) - 1;'`);
+            } else if (navAction === "reload_page") {
+                lines.push(`    on_press:`);
+                lines.push(`      - script.execute: manage_run_and_sleep`);
+            } else if (w.entity_id) {
+                // Default: Entity toggle behavior
+                lines.push(`    on_press:`);
+                lines.push(`      - homeassistant.service:`);
+                lines.push(`          service: homeassistant.toggle`);
+                lines.push(`          data:`);
+                lines.push(`            entity_id: ${w.entity_id}`);
+            }
         });
     }
 
@@ -537,25 +569,17 @@ function generateButtonSection(profile, numPages, displayId = "my_display") {
     lines.push("    name: \"Next Page\"");
     lines.push("    on_press:");
     lines.push("      then:");
-    lines.push("        - lambda: |-");
-    lines.push(`            if (id(display_page) < ${numPages - 1}) {`);
-    lines.push("              id(display_page) += 1;");
-    lines.push("            } else {");
-    lines.push("              id(display_page) = 0;");
-    lines.push("            }");
-    lines.push(`        - component.update: ${displayId}`);
+    lines.push("        - script.execute:");
+    lines.push("            id: change_page_to");
+    lines.push("            target_page: !lambda 'return id(display_page) + 1;'");
 
     lines.push("  - platform: template");
     lines.push("    name: \"Previous Page\"");
     lines.push("    on_press:");
     lines.push("      then:");
-    lines.push("        - lambda: |-");
-    lines.push("            if (id(display_page) > 0) {");
-    lines.push("              id(display_page) -= 1;");
-    lines.push("            } else {");
-    lines.push(`              id(display_page) = ${numPages - 1};`);
-    lines.push("            }");
-    lines.push(`        - component.update: ${displayId}`);
+    lines.push("        - script.execute:");
+    lines.push("            id: change_page_to");
+    lines.push("            target_page: !lambda 'return id(display_page) - 1;'");
 
     // Refresh Display button
     lines.push("  - platform: template");
@@ -570,8 +594,9 @@ function generateButtonSection(profile, numPages, displayId = "my_display") {
         lines.push(`    name: "Go to Page ${i + 1}"`);
         lines.push("    on_press:");
         lines.push("      then:");
-        lines.push(`        - lambda: 'id(display_page) = ${i};'`);
-        lines.push(`        - component.update: ${displayId}`);
+        lines.push("        - script.execute:");
+        lines.push("            id: change_page_to");
+        lines.push(`            target_page: ${i}`);
     }
 
     if (profile.features.buzzer) {

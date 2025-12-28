@@ -367,7 +367,8 @@ function parseSnippetYamlOffline(yamlText) {
         deep_sleep_enabled: false,
         deep_sleep_interval: 600,
         daily_refresh_enabled: false,
-        daily_refresh_time: "08:00"
+        daily_refresh_time: "08:00",
+        refresh_interval: 600
     };
 
     for (const rawLine of lines) {
@@ -377,6 +378,7 @@ function parseSnippetYamlOffline(yamlText) {
         let m;
         if (m = line.match(/Orientation:\s*(landscape|portrait)/i)) deviceSettings.orientation = m[1].toLowerCase();
         if (m = line.match(/Dark Mode:\s*(enabled|disabled)/i)) deviceSettings.dark_mode = (m[1].toLowerCase() === "enabled");
+        if (m = line.match(/Refresh Interval:\s*(\d+)/i)) deviceSettings.refresh_interval = parseInt(m[1], 10);
 
         // Handle New Power Strategy format
         if (m = line.match(/Power Strategy:\s*(.*)/i)) {
@@ -435,10 +437,10 @@ function parseSnippetYamlOffline(yamlText) {
     }
 
     function parseWidgetMarker(comment) {
-        // Relaxed regex: allow any spacing
-        const match = comment.match(/^\/\/\s*widget:(\w+)\s+(.+)$/);
+        // Relaxed regex: allow any spacing and both # and // markers
+        const match = comment.match(/^(?:#\s*|\/\/\s*)widget:(\w+)\s+(.+)$/);
         if (!match) {
-            if (comment.startsWith("// widget:")) {
+            if (comment.startsWith("// widget:") || comment.startsWith("# widget:")) {
                 console.warn("[parseWidgetMarker] Regex failed for:", comment);
             }
             return null;
@@ -472,7 +474,9 @@ function parseSnippetYamlOffline(yamlText) {
     for (let i = 0; i < lambdaLines.length; i++) {
         const cmd = lambdaLines[i];
         const trimmed = cmd.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
+        if (!trimmed) continue;
+        // Skip pure comments, but NOT widget markers (which start with # widget:)
+        if (trimmed.startsWith("#") && !trimmed.match(/^#\s*widget:/)) continue;
 
         // Native Lambda Page Check
         let pageMatch = trimmed.match(/if\s*\(\s*(?:id\s*\(\s*display_page\s*\)|page|currentPage)\s*==\s*(\d+)\s*\)/);
@@ -495,14 +499,14 @@ function parseSnippetYamlOffline(yamlText) {
 
         if (skipRendering) {
             // Stop skipping if we see a new widget marker, a page transition, or a line with 0 indent
-            if (trimmed.match(/^\/\/\s*widget:/) || trimmed.match(/^\s*-\s*id:/) || !cmd.match(/^\s/)) {
+            if (trimmed.match(/^(?:#\s*|\/\/\s*)widget:/) || trimmed.match(/^\s*-\s*id:/) || !cmd.match(/^\s/)) {
                 skipRendering = false;
             } else {
                 continue;
             }
         }
 
-        if (trimmed.startsWith("//")) {
+        if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
             const marker = parseWidgetMarker(trimmed);
             if (marker && marker.props.id) {
                 const p = marker.props;
@@ -1309,7 +1313,8 @@ function loadLayoutIntoState(layout) {
     const settingKeys = [
         "orientation", "dark_mode", "sleep_enabled", "sleep_start_hour", "sleep_end_hour",
         "manual_refresh_only", "deep_sleep_enabled", "deep_sleep_interval",
-        "daily_refresh_enabled", "daily_refresh_time", "no_refresh_start_hour", "no_refresh_end_hour"
+        "daily_refresh_enabled", "daily_refresh_time", "no_refresh_start_hour", "no_refresh_end_hour",
+        "auto_cycle_enabled", "auto_cycle_interval_s", "refresh_interval"
     ];
 
     settingKeys.forEach(key => {
@@ -1339,6 +1344,7 @@ function loadLayoutIntoState(layout) {
     if (newSettings.deep_sleep_interval === undefined) newSettings.deep_sleep_interval = 600;
     if (newSettings.daily_refresh_enabled === undefined) newSettings.daily_refresh_enabled = false;
     if (newSettings.daily_refresh_time === undefined) newSettings.daily_refresh_time = "08:00";
+    if (newSettings.refresh_interval === undefined) newSettings.refresh_interval = 600;
 
     // Update State
     AppState.setPages(pages);

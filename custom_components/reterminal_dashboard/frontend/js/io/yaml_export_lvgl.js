@@ -109,7 +109,7 @@ function serializeYamlObject(obj, lines, indentLevel) {
  * Serializes a widget to the // widget:type ... format used by yaml_import.js
  */
 function serializeWidget(w) {
-    const parts = [`// widget:${w.type}`];
+    const parts = [`# widget:${w.type}`];
 
     // Core properties
     parts.push(`id:${w.id}`);

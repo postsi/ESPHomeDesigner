@@ -75,6 +75,7 @@ class WidgetFactory {
             height: 40,
             title: "",
             entity_id: "",
+            locked: false,
             props: {}
         };
 
@@ -269,7 +270,7 @@ class WidgetFactory {
                 widget.width = 60;
                 widget.height = 60;
                 widget.props = {
-                    code: "F0595",
+                    code: "F07D0",
                     size: 40,
                     color: defaultColor,
                     font_ref: "font_mdi_medium",
@@ -364,11 +365,56 @@ class WidgetFactory {
                 widget.props = {
                     title: "Touch Area",
                     color: "rgba(0, 0, 255, 0.2)",
-                    border_color: "#0000ff"
+                    border_color: "#0000ff",
+                    nav_action: "none",
+                    icon: "",
+                    icon_size: 40
                 };
                 // Default size
                 widget.width = 100;
                 widget.height = 100;
+                break;
+
+            case "nav_next_page":
+                widget.type = "touch_area";
+                widget.props = {
+                    title: "Next",
+                    color: "rgba(0, 128, 255, 0.2)",
+                    border_color: "#0080ff",
+                    nav_action: "next_page",
+                    icon: "F0142",
+                    icon_size: 48
+                };
+                widget.width = 80;
+                widget.height = 80;
+                break;
+
+            case "nav_previous_page":
+                widget.type = "touch_area";
+                widget.props = {
+                    title: "Previous",
+                    color: "rgba(0, 128, 255, 0.2)",
+                    border_color: "#0080ff",
+                    nav_action: "previous_page",
+                    icon: "F0141",
+                    icon_size: 48
+                };
+                widget.width = 80;
+                widget.height = 80;
+                break;
+
+            case "nav_reload_page":
+                widget.type = "touch_area";
+                widget.props = {
+                    title: "Reload",
+                    color: "rgba(0, 128, 255, 0.2)",
+                    border_color: "#0080ff",
+                    nav_action: "reload_page",
+                    icon: "F0450",
+                    icon_size: 48
+                };
+                widget.width = 80;
+                widget.height = 80;
                 break;
 
             case "lvgl_button":

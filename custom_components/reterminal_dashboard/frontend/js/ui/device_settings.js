@@ -30,8 +30,16 @@ class DeviceSettings {
         this.deepSleepInterval = document.getElementById('setting-deep-sleep-interval');
         this.deepSleepRow = document.getElementById('deep-sleep-interval-row');
 
+        this.refreshIntervalInput = document.getElementById('setting-refresh-interval');
+        this.refreshIntervalRow = document.getElementById('global-refresh-row');
+
         this.noRefreshStart = document.getElementById('setting-no-refresh-start');
         this.noRefreshEnd = document.getElementById('setting-no-refresh-end');
+
+        // Auto-Cycle
+        this.autoCycleEnabled = document.getElementById('setting-auto-cycle');
+        this.autoCycleInterval = document.getElementById('setting-auto-cycle-interval');
+        this.autoCycleRow = document.getElementById('field-auto-cycle-interval');
     }
 
     init() {
@@ -109,10 +117,15 @@ class DeviceSettings {
         if (this.sleepEnd) this.sleepEnd.value = s.sleep_end_hour ?? 5;
         if (this.dailyRefreshTime) this.dailyRefreshTime.value = s.daily_refresh_time || "08:00";
         if (this.deepSleepInterval) this.deepSleepInterval.value = s.deep_sleep_interval ?? 600;
+        if (this.refreshIntervalInput) this.refreshIntervalInput.value = s.refresh_interval ?? 600;
 
         // Silent Hours
         if (this.noRefreshStart) this.noRefreshStart.value = s.no_refresh_start_hour ?? "";
         if (this.noRefreshEnd) this.noRefreshEnd.value = s.no_refresh_end_hour ?? "";
+
+        // Auto-Cycle
+        if (this.autoCycleEnabled) this.autoCycleEnabled.checked = !!s.auto_cycle_enabled;
+        if (this.autoCycleInterval) this.autoCycleInterval.value = s.auto_cycle_interval_s ?? 30;
 
         // Show/hide sub-settings
         this.updateVisibility();
@@ -166,10 +179,18 @@ class DeviceSettings {
         const isSleep = this.modeSleep && this.modeSleep.checked;
         const isDaily = this.modeDaily && this.modeDaily.checked;
         const isDeepSleep = this.modeDeepSleep && this.modeDeepSleep.checked;
+        const isManual = this.modeManual && this.modeManual.checked;
 
         if (this.sleepRow) this.sleepRow.style.display = isSleep ? 'flex' : 'none';
         if (this.dailyRefreshRow) this.dailyRefreshRow.style.display = isDaily ? 'flex' : 'none';
         if (this.deepSleepRow) this.deepSleepRow.style.display = isDeepSleep ? 'block' : 'none';
+
+        const needsRefreshInterval = !isDaily && !isManual;
+        if (this.refreshIntervalRow) this.refreshIntervalRow.style.display = needsRefreshInterval ? 'block' : 'none';
+
+        if (this.autoCycleRow) {
+            this.autoCycleRow.style.display = (this.autoCycleEnabled && this.autoCycleEnabled.checked) ? 'flex' : 'none';
+        }
     }
 
     persistToBackend() {
@@ -188,7 +209,7 @@ class DeviceSettings {
                     const payload = AppState.getPagesPayload();
                     payload.deviceName = AppState.deviceName;
                     payload.deviceModel = AppState.deviceModel;
-                    localStorage.setItem("esphome_designer_layout", JSON.stringify(payload));
+                    localStorage.setItem("esphome-designer-layout", JSON.stringify(payload));
                     console.log("[DeviceSettings] Settings persisted to localStorage (offline mode)");
                 } catch (err) {
                     console.warn("[DeviceSettings] Failed to save to localStorage:", err);
@@ -306,7 +327,26 @@ class DeviceSettings {
         // Deep Sleep Interval
         if (this.deepSleepInterval) {
             this.deepSleepInterval.addEventListener('input', () => {
-                updateSetting('deep_sleep_interval', parseInt(this.deepSleepInterval.value) || 600);
+                const val = parseInt(this.deepSleepInterval.value) || 600;
+                updateSetting('deep_sleep_interval', val);
+                // Sync with global refresh interval if that exists
+                if (this.refreshIntervalInput) {
+                    this.refreshIntervalInput.value = val;
+                    AppState.settings.refresh_interval = val;
+                }
+            });
+        }
+
+        // Global Refresh Interval
+        if (this.refreshIntervalInput) {
+            this.refreshIntervalInput.addEventListener('input', () => {
+                const val = parseInt(this.refreshIntervalInput.value) || 600;
+                updateSetting('refresh_interval', val);
+                // Sync with deep sleep interval for consistency
+                if (this.deepSleepInterval && (this.modeDeepSleep && this.modeDeepSleep.checked)) {
+                    this.deepSleepInterval.value = val;
+                    AppState.settings.deep_sleep_interval = val;
+                }
             });
         }
 
@@ -321,6 +361,20 @@ class DeviceSettings {
             this.noRefreshEnd.addEventListener('change', () => {
                 const val = this.noRefreshEnd.value === "" ? null : parseInt(this.noRefreshEnd.value);
                 updateSetting('no_refresh_end_hour', val);
+            });
+        }
+
+        // Auto-Cycle
+        if (this.autoCycleEnabled) {
+            this.autoCycleEnabled.addEventListener('change', () => {
+                updateSetting('auto_cycle_enabled', this.autoCycleEnabled.checked);
+                this.updateVisibility();
+            });
+        }
+        if (this.autoCycleInterval) {
+            this.autoCycleInterval.addEventListener('input', () => {
+                const val = Math.max(5, parseInt(this.autoCycleInterval.value) || 30);
+                updateSetting('auto_cycle_interval_s', val);
             });
         }
     }

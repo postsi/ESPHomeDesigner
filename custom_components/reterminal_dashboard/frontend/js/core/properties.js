@@ -154,6 +154,19 @@ class PropertiesPanel {
             });
         }
 
+        // Bind Lock Toggle (Static in sidebar)
+        const lockToggle = document.getElementById("lockPositionToggle");
+        if (lockToggle) {
+            lockToggle.addEventListener("change", (e) => {
+                const widget = AppState.getSelectedWidget();
+                if (widget) {
+                    AppState.updateWidget(widget.id, { locked: e.target.checked });
+                    // Trigger a re-render of the canvas to update handles/cursor
+                    emit(EVENTS.STATE_CHANGED);
+                }
+            });
+        }
+
         this.render();
     }
 
@@ -180,12 +193,37 @@ class PropertiesPanel {
         this.lastRenderedWidgetId = currentWidgetId;
 
         this.panel.innerHTML = "";
-        const widget = AppState.getSelectedWidget();
-
-        if (!widget) {
+        if (AppState.selectedWidgetIds.length === 0) {
             this.panel.innerHTML = "<div style='padding:16px;color:#aaa;text-align:center;'>Select a widget to edit properties</div>";
+            const lockToggle = document.getElementById("lockPositionToggle");
+            if (lockToggle) {
+                lockToggle.checked = false;
+                lockToggle.disabled = true;
+            }
             return;
         }
+
+        if (AppState.selectedWidgetIds.length > 1) {
+            this.panel.innerHTML = `
+                <div style='padding:16px; text-align:center;'>
+                    <div style="font-size: 24px; margin-bottom: 12px;">📑</div>
+                    <div style="font-weight: 600; color: var(--text);">${AppState.selectedWidgetIds.length} widgets selected</div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 8px;">
+                        Bulk editing is not supported yet. Move, group, or delete the selection.
+                    </div>
+                </div>
+            `;
+            const lockToggle = document.getElementById("lockPositionToggle");
+            if (lockToggle) {
+                lockToggle.checked = false;
+                lockToggle.disabled = true;
+            }
+            return;
+        }
+
+        const widget = AppState.getSelectedWidget();
+        if (!widget) return;
+
 
         const type = (widget.type || "").toLowerCase();
         const title = document.createElement("div");
@@ -193,6 +231,13 @@ class PropertiesPanel {
         title.style.marginTop = "0";
         title.textContent = `${type} Properties`;
         this.panel.appendChild(title);
+
+        // Update Lock Toggle state based on widget
+        const lockToggle = document.getElementById("lockPositionToggle");
+        if (lockToggle) {
+            lockToggle.checked = !!widget.locked;
+            lockToggle.disabled = false;
+        }
 
         // === LAYER ORDER SECTION (TOP) ===
         this.addSectionLabel("Layer Order");
@@ -651,7 +696,7 @@ class PropertiesPanel {
             this.addCheckbox("Fit icon to frame", props.fit_icon_to_frame || false, (v) => updateProp("fit_icon_to_frame", v));
 
             // Use the new reusable icon picker
-            this.addIconPicker("Select Icon", props.code || "F0595", (v) => updateProp("code", v), widget);
+            this.addIconPicker("Select Icon", props.code || "F07D0", (v) => updateProp("code", v), widget);
 
             this.addLabeledInput("Icon Size (px)", "number", props.size || 40, (v) => {
                 let n = parseInt(v || "40", 10);
@@ -721,7 +766,7 @@ class PropertiesPanel {
                 AppState.updateWidget(widget.id, { entity_id: v });
             }, widget);
 
-            this.addCheckbox("Local / On-Device Sensor (SHT4x)", props.is_local_sensor !== false, (v) => updateProp("is_local_sensor", v));
+            this.addCheckbox("Local / On-Device Sensor", props.is_local_sensor !== false, (v) => updateProp("is_local_sensor", v));
             this.addCheckbox("Fit icon to frame", props.fit_icon_to_frame || false, (v) => updateProp("fit_icon_to_frame", v));
             this.addCheckbox("Show Label", props.show_label !== false, (v) => updateProp("show_label", v));
 
@@ -756,7 +801,7 @@ class PropertiesPanel {
                 AppState.updateWidget(widget.id, { entity_id: v });
             }, widget);
 
-            this.addCheckbox("Local / On-Device Sensor (SHT4x)", props.is_local_sensor !== false, (v) => updateProp("is_local_sensor", v));
+            this.addCheckbox("Local / On-Device Sensor", props.is_local_sensor !== false, (v) => updateProp("is_local_sensor", v));
             this.addCheckbox("Fit icon to frame", props.fit_icon_to_frame || false, (v) => updateProp("fit_icon_to_frame", v));
             this.addCheckbox("Show Label", props.show_label !== false, (v) => updateProp("show_label", v));
 
@@ -841,6 +886,38 @@ class PropertiesPanel {
             }
 
             this.addSelect("Color", props.color || "black", colors, (v) => updateProp("color", v));
+        }
+        else if (type === "touch_area") {
+            // Navigation Action dropdown
+            this.addSelect("Navigation Action", props.nav_action || "none", [
+                { value: "none", label: "None (Entity Toggle)" },
+                { value: "next_page", label: "Next Page" },
+                { value: "previous_page", label: "Previous Page" },
+                { value: "reload_page", label: "Reload Page" }
+            ], (v) => {
+                updateProp("nav_action", v);
+                // Auto-set icon when action changes if no icon is set or if it's one of the defaults
+                const isDefaultNavIcon = props.icon === "F0142" || props.icon === "F0141" || props.icon === "F0450" || !props.icon;
+                if (isDefaultNavIcon) {
+                    if (v === "next_page") updateProp("icon", "F0142");
+                    else if (v === "previous_page") updateProp("icon", "F0141");
+                    else if (v === "reload_page") updateProp("icon", "F0450");
+                }
+            });
+
+            // Only show entity picker if nav_action is "none"
+            if ((props.nav_action || "none") === "none") {
+                this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                    AppState.updateWidget(widget.id, { entity_id: v });
+                }, widget);
+            }
+
+            this.addLabeledInput("Title", "text", props.title || "", (v) => updateProp("title", v));
+            this.addIconPicker("Icon", props.icon || "", (v) => updateProp("icon", v), widget);
+            this.addLabeledInput("Icon Size", "number", props.icon_size || 40, (v) => updateProp("icon_size", parseInt(v, 10)));
+            this.addSelect("Icon Color", props.icon_color || "black", colors, (v) => updateProp("icon_color", v));
+            this.addSelect("Background Color", props.color || "rgba(0, 0, 255, 0.2)", colors, (v) => updateProp("color", v));
+            this.addSelect("Border Color", props.border_color || "#0000ff", colors, (v) => updateProp("border_color", v));
         }
         else if (type === "image") {
             this.addHint("🖼️ Static image from ESPHome:<br/><code style='background:#f0f0f0;padding:2px 4px;border-radius:2px;'>/config/esphome/images/logo.png</code><br/><span style='color:#4a9eff;'>ℹ️ Place images in /config/esphome/images/ folder</span>");

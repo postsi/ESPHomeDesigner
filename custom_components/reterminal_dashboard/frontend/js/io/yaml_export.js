@@ -276,12 +276,26 @@ async function generateSnippetLocally() {
             lines.push("#         - Select: ESP32-S3 (or appropriate for your board)");
         }
         lines.push("#");
+        lines.push("# ============================================================================");
+        lines.push("");
+    }
+
+    // =========================================================================
+    // Generate actual on_boot section for LCD devices
+    // This fixes Issue #80: LCD displays showing black screen until first refresh
+    // =========================================================================
+
+    if (!profile.isPackageBased) {
+        lines.push("# ============================================================================");
         lines.push("# STEP 3: Add the on_boot sequence");
-        lines.push("#         (TIP: If compiling fails with 'OOM' or 'Killed', add 'compile_process_limit: 1' to your 'esphome:' section)");
-        if (getDeviceModel() === "esp32_s3_photopainter") {
-            lines.push("#         CRITICAL FOR PHOTOPAINTER: Use this exact on_boot sequence to prevent boot loops!");
-            lines.push("#         Paste this under 'esphome:' in your YAML:");
-            lines.push("#");
+        lines.push("# Paste the following into your 'esphome:' section.");
+        lines.push("# (TIP: If compiling fails with 'OOM', add 'compile_process_limit: 1' to 'esphome:')");
+        lines.push("# ============================================================================");
+
+        const deviceModel = getDeviceModel();
+
+        if (deviceModel === "esp32_s3_photopainter") {
+            lines.push("# esphome:");
             lines.push("#   on_boot:");
             lines.push("#     priority: 800");
             lines.push("#     then:");
@@ -297,16 +311,22 @@ async function generateSnippetLocally() {
             lines.push("#       - delay: 200ms");
             lines.push("#       - component.update: epaper_display");
             lines.push("#       - script.execute: manage_run_and_sleep");
-            lines.push("#");
-        } else if (getDeviceModel() === "m5stack_paper") {
-            lines.push("#         Paste this under 'esphome:' in your YAML:");
-            lines.push("#");
+            // Auto-cycle for photopainter? Assuming yes if intended
+            if (payload.auto_cycle_enabled && pagesLocal.length > 1 && !payload.manual_refresh_only) {
+                lines.push("#       - script.execute: auto_cycle_timer");
+            }
+
+        } else if (deviceModel === "m5stack_paper") {
+            lines.push("# esphome:");
             lines.push("#   on_boot:");
             lines.push("#     - priority: 600");
             lines.push("#       then:");
             lines.push("#       - delay: 2s");
             lines.push("#       - component.update: epaper_display");
             lines.push("#       - script.execute: manage_run_and_sleep");
+            if (payload.auto_cycle_enabled && pagesLocal.length > 1 && !payload.manual_refresh_only) {
+                lines.push("#       - script.execute: auto_cycle_timer");
+            }
             lines.push("#     - priority: 220.0");
             lines.push("#       then:");
             lines.push("#           - it8951e.clear");
@@ -316,53 +336,44 @@ async function generateSnippetLocally() {
             lines.push("#       then:");
             lines.push("#       - delay: 10s");
             lines.push("#       - component.update: epaper_display");
-            lines.push("#");
-        } else if (getDeviceModel() === "m5stack_coreink") {
-            lines.push("#         Paste this under 'esphome:' in your YAML:");
-            lines.push("#");
+
+        } else if (deviceModel === "m5stack_coreink") {
+            lines.push("# esphome:");
             lines.push("#   on_boot:");
             lines.push("#     priority: 800");
             lines.push("#     then:");
-            lines.push("#       # Hardware Power Lock (keeps device powered during operation)");
+            lines.push("#       # Hardware Power Lock");
             lines.push("#       - lambda: |-");
             lines.push("#           gpio_set_direction(GPIO_NUM_12, GPIO_MODE_OUTPUT);");
             lines.push("#           gpio_set_level(GPIO_NUM_12, 1);");
             lines.push("#           gpio_hold_en(GPIO_NUM_12);");
             lines.push("#           gpio_deep_sleep_hold_en();");
             lines.push("#       - script.execute: activity_timer");
-            lines.push("#");
+            // CoreInk doesn't use standard manage_run_and_sleep? Original code said 'activity_timer'.
+            // Keeping original logic.
+
         } else {
-            lines.push("#         Paste this under 'esphome:' in your YAML:");
-            lines.push("#");
+            // Standard LCD/E-Paper (Default)
+            lines.push("# esphome:");
             lines.push("#   on_boot:");
             lines.push("#     priority: 600");
             lines.push("#     then:");
-            if (getDeviceModel() !== "trmnl") {
+            if (deviceModel !== "trmnl") {
                 lines.push("#       - output.turn_on: bsp_battery_enable");
             }
+            lines.push("#       - delay: 2s  # Wait for Home Assistant API connection");
             lines.push("#       - script.execute: manage_run_and_sleep");
-            lines.push("#");
-        }
-        lines.push("# ============================================================================");
-        lines.push("");
-    }
 
-    // =========================================================================
-    // Generate actual on_boot section for LCD devices
-    // This fixes Issue #80: LCD displays showing black screen until first refresh
-    // =========================================================================
-    if (isLcd && !profile.isPackageBased) {
-        lines.push("esphome:");
-        lines.push("  on_boot:");
-        lines.push("    priority: 600");
-        lines.push("    then:");
-        lines.push("      - delay: 2s  # Wait for Home Assistant API connection");
-        lines.push("      - script.execute: manage_run_and_sleep");
+            if (payload.auto_cycle_enabled && pagesLocal.length > 1 && !payload.manual_refresh_only) {
+                lines.push("#       - script.execute: auto_cycle_timer");
+            }
+        }
+        lines.push("#");
         lines.push("");
     }
 
     // --- PACKAGE CONTENT ---
-    if (packageContent) {
+    if (packageContent && !profile.isPackageBased) {
         // Sanitize the content to ensure partial-YAML compliance
         const sanitized = sanitizePackageContent(packageContent);
 
@@ -401,6 +412,7 @@ async function generateSnippetLocally() {
     lines.push("# ====================================");
     lines.push(`# Orientation: ${payload.orientation || 'landscape'}`);
     lines.push(`# Dark Mode: ${payload.dark_mode ? 'enabled' : 'disabled'}`);
+    lines.push(`# Refresh Interval: ${payload.refresh_interval || 600}`);
 
     // Power Strategy
     if (payload.daily_refresh_enabled) {
@@ -436,13 +448,19 @@ async function generateSnippetLocally() {
     lines.push("    type: int");
     lines.push("    restore_value: true");
     // LCD devices should refresh quickly; e-paper/battery devices can use longer intervals
-    const defaultRefreshInterval = isLcd ? 60 : (payload.deep_sleep_interval || 600);
+    const defaultRefreshInterval = payload.refresh_interval || (isLcd ? 60 : (payload.deep_sleep_interval || 600));
     lines.push(`    initial_value: '${defaultRefreshInterval}'`);
 
     lines.push("  - id: page_refresh_current_s");
     lines.push("    type: int");
     lines.push("    restore_value: false");
     lines.push("    initial_value: '60'");
+
+    // Track last page switch time for auto-cycle
+    lines.push("  - id: last_page_switch_time");
+    lines.push("    type: uint32_t");
+    lines.push("    restore_value: false");
+    lines.push("    initial_value: '0'");
 
     // CoreInk: Add stay_awake_mode global for Prevent Sleep feature
     if (getDeviceModel() === "m5stack_coreink") {
@@ -499,6 +517,16 @@ async function generateSnippetLocally() {
         lines.push(...generateBacklightSection(profile));
         lines.push(...generateRTTTLSection(profile));
         lines.push(...generateAudioSection(profile));
+
+        // Generate Deep Sleep if required
+        // (Required for CoreInk and any Deep Sleep power strategy)
+        if (payload.deep_sleep_enabled || profile.model === "m5stack_coreink" || (profile.name && profile.name.includes("CoreInk"))) {
+            lines.push("deep_sleep:");
+            lines.push("  id: deep_sleep_1");
+            lines.push("  run_duration: 1h # Prevent bootloop if logic fails");
+            lines.push("  sleep_duration: 10min");
+            lines.push("");
+        }
     }
 
 
@@ -721,38 +749,9 @@ async function generateSnippetLocally() {
         }
     }
 
-    // Add SHT4x sensors if any ondevice_temperature or ondevice_humidity widgets use local sensor
-    let needsLocalTempSensor = false;
-    let needsLocalHumiditySensor = false;
-    for (const page of pagesLocal) {
-        if (!page.widgets) continue;
-        for (const w of page.widgets) {
-            const t = (w.type || "").toLowerCase();
-            const p = w.props || {};
-            if (t === "ondevice_temperature" && p.is_local_sensor !== false) {
-                needsLocalTempSensor = true;
-            }
-            if (t === "ondevice_humidity" && p.is_local_sensor !== false) {
-                needsLocalHumiditySensor = true;
-            }
-        }
-        if (needsLocalTempSensor && needsLocalHumiditySensor) break;
-    }
-    if (needsLocalTempSensor || needsLocalHumiditySensor) {
-        widgetSensorLines.push(`  # SHT4x Temperature/Humidity Sensor`);
-        widgetSensorLines.push(`  - platform: sht4x`);
-        if (needsLocalTempSensor) {
-            widgetSensorLines.push(`    temperature:`);
-            widgetSensorLines.push(`      name: "On-Device Temperature"`);
-            widgetSensorLines.push(`      id: sht4x_temperature`);
-        }
-        if (needsLocalHumiditySensor) {
-            widgetSensorLines.push(`    humidity:`);
-            widgetSensorLines.push(`      name: "On-Device Humidity"`);
-            widgetSensorLines.push(`      id: sht4x_humidity`);
-        }
-        widgetSensorLines.push(`    update_interval: 60s`);
-    }
+    // SHT sensors (SHT4x, SHT3x, SHTC3) are now handled by generateSensorSection
+    // based on profile.features, so we don't need to add them to widgetSensorLines here.
+    // This prevents duplication for devices like M5Paper or PhotoPainter.
 
     // Call generic sensor generator
     lines.push(...generateSensorSection(profile, widgetSensorLines, displayId));
@@ -1404,46 +1403,49 @@ async function generateSnippetLocally() {
     // ===================================
 
     let insertIdx = -1;
-    // Search for the display component block
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim() === "display:") {
-            // Found start of display block. Now find the end of it (next root key or end of file)
-            // But we want to insert 'lambda: |-' into this block.
-            // If the block is "display: ... lines ...", we usually append to it.
-            // However, it might be followed by "font:" or similar if we aren't careful.
-            // In the current generation order, display is LAST (except maybe fonts?).
-            // Let's verify if fonts are generated before or after.
-            // Fonts are generated BEFORE generateSnippetLocally returns, via lines.splice logic?
-            // No, fonts are generated in generateDisplaySection? No.
-            // Wait, usually fonts are generated separately.
+    // Search for the display component block - ONLY for non-package devices
+    // (Package devices handle lambda injection via placeholder replacement)
+    if (!profile.isPackageBased) {
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].trim() === "display:") {
+                // Found start of display block. Now find the end of it (next root key or end of file)
+                // But we want to insert 'lambda: |-' into this block.
+                // If the block is "display: ... lines ...", we usually append to it.
+                // However, it might be followed by "font:" or similar if we aren't careful.
+                // In the current generation order, display is LAST (except maybe fonts?).
+                // Let's verify if fonts are generated before or after.
+                // Fonts are generated BEFORE generateSnippetLocally returns, via lines.splice logic?
+                // No, fonts are generated in generateDisplaySection? No.
+                // Wait, usually fonts are generated separately.
 
-            // Let's just find the end of the current indentation block.
-            // We search forward from i+1.
-            let j = i + 1;
-            while (j < lines.length) {
-                const line = lines[j];
-                // Next root key check: no indentation, ends with colon, not a comment
-                if (line.match(/^[a-z0-9_-]+:$/) && !line.startsWith("#")) {
-                    insertIdx = j; // Insert before the next component
-                    break;
+                // Let's just find the end of the current indentation block.
+                // We search forward from i+1.
+                let j = i + 1;
+                while (j < lines.length) {
+                    const line = lines[j];
+                    // Next root key check: no indentation, ends with colon, not a comment
+                    if (line.match(/^[a-z0-9_-]+:$/) && !line.startsWith("#")) {
+                        insertIdx = j; // Insert before the next component
+                        break;
+                    }
+                    j++;
                 }
-                j++;
+                if (insertIdx === -1) insertIdx = lines.length; // End of file
+                break;
             }
-            if (insertIdx === -1) insertIdx = lines.length; // End of file
-            break;
         }
-    }
 
-    if (insertIdx !== -1) {
-        // We need to insert the "lambda: |-" line first, because generateDisplaySection does not return it.
-        // The original logic assumed it existed because it was part of the hardcoded display block.
-        // Now display is dynamic.
+        if (insertIdx !== -1) {
+            // We need to insert the "lambda: |-" line first, because generateDisplaySection does not return it.
+            // The original logic assumed it existed because it was part of the hardcoded display block.
+            // Now display is dynamic.
 
-        // We'll insert the lambda header at insertIdx, and increment insertIdx so the content follows.
-        lines.splice(insertIdx, 0, "    lambda: |-");
-        insertIdx++; // Start inserting content after this line
-    } else {
-        // Fallback: if display block not found? This shouldn't happen.
+            // We'll insert the lambda header at insertIdx, and increment insertIdx so the content follows.
+            lines.splice(insertIdx, 0, "    lambda: |-");
+            insertIdx++; // Start inserting content after this line
+        } else {
+            // Fallback: if display block not found? This shouldn't happen.
+        }
     }
 
     // Generate lambda content (for ALL devices - both package-based and regular)
@@ -1910,7 +1912,7 @@ async function generateSnippetLocally() {
                                     const niceStep = Math.pow(10, Math.floor(Math.log10(step)));
                                     const normalized = step / niceStep;
                                     let yGridVal;
-                                    if (normalized <= 1) yGridVal = niceStep;
+                                    if (normalized <= 1) yGridVal = 1 * niceStep;
                                     else if (normalized <= 2) yGridVal = 2 * niceStep;
                                     else if (normalized <= 5) yGridVal = 5 * niceStep;
                                     else yGridVal = 10 * niceStep;
@@ -2153,18 +2155,21 @@ async function generateSnippetLocally() {
                             // Determine sensor ID
                             let sensorId;
                             if (isLocal) {
-                                sensorId = "sht4x_temperature";
+                                if (profile.features.sht4x) sensorId = "sht4x_temperature";
+                                else if (profile.features.sht3x) sensorId = "sht3x_temperature";
+                                else if (profile.features.shtc3) sensorId = "shtc3_temperature";
+                                else sensorId = "sht4x_temperature"; // Fallback
                             } else {
-                                sensorId = entityId ? entityId.replace(/^sensor\\./, "").replace(/\\./g, "_").replace(/-/g, "_") : "sht4x_temperature";
+                                sensorId = entityId ? entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") : "sht4x_temperature";
                             }
 
-                            lines.push(`        // widget:ondevice_temperature id:${w.id} x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "sht4x_temperature"} icon_size:${iconSize} font_size:${fontSize} color:${colorProp} local:${isLocal} ${getCondProps(w)}`);
+                            lines.push(`        // widget:ondevice_temperature id:${w.id} x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || sensorId} icon_size:${iconSize} font_size:${fontSize} color:${colorProp} local:${isLocal} ${getCondProps(w)}`);
                             lines.push(`        {`);
                             lines.push(`          const char* temp_icon = "\\U000F050F"; // Default: thermometer`);
                             lines.push(`          float temp_val = 22.5;`);
                             lines.push(`          if (id(${sensorId}).has_state()) {`);
                             lines.push(`            temp_val = id(${sensorId}).state;`);
-                            lines.push(`            if (temp_val <= 10) temp_icon = "\\\\U000F0E4C";      // thermometer-low`);
+                            lines.push(`            if (temp_val <= 10) temp_icon = "\\U000F0E4C";      // thermometer-low`);
                             lines.push(`            else if (temp_val > 25) temp_icon = "\\U000F10C2"; // thermometer-high`);
                             lines.push(`          }`);
                             // Icon centered at top
@@ -2203,12 +2208,15 @@ async function generateSnippetLocally() {
                             // Determine sensor ID
                             let sensorId;
                             if (isLocal) {
-                                sensorId = "sht4x_humidity";
+                                if (profile.features.sht4x) sensorId = "sht4x_humidity";
+                                else if (profile.features.sht3x) sensorId = "sht3x_humidity";
+                                else if (profile.features.shtc3) sensorId = "shtc3_humidity";
+                                else sensorId = "sht4x_humidity"; // Fallback
                             } else {
-                                sensorId = entityId ? entityId.replace(/^sensor\\./, "").replace(/\\./g, "_").replace(/-/g, "_") : "sht4x_humidity";
+                                sensorId = entityId ? entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_") : "sht4x_humidity";
                             }
 
-                            lines.push(`        // widget:ondevice_humidity id:${w.id} x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "sht4x_humidity"} icon_size:${iconSize} font_size:${fontSize} color:${colorProp} local:${isLocal} ${getCondProps(w)}`);
+                            lines.push(`        // widget:ondevice_humidity id:${w.id} x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || sensorId} icon_size:${iconSize} font_size:${fontSize} color:${colorProp} local:${isLocal} ${getCondProps(w)}`);
                             lines.push(`        {`);
                             lines.push(`          const char* hum_icon = "\\U000F058E"; // Default: water-percent`);
                             lines.push(`          float hum_val = 45;`);
@@ -2865,8 +2873,11 @@ async function generateSnippetLocally() {
 
         // Store lambda for package-based devices (will be used for placeholder replacement)
         if (profile.isPackageBased && packageContent) {
-            const lambdaContent = "    lambda: |-\n" + lambdaLines.join("\n");
-            packageContent = packageContent.replace("    # __LAMBDA_PLACEHOLDER__", lambdaContent);
+            // Check if recipe already contains the lambda header (avoids double lambda: |-)
+            const hasHeader = packageContent.includes("lambda: |-");
+            const lambdaContent = (hasHeader ? "" : "    lambda: |-\n") + lambdaLines.join("\n");
+
+            packageContent = packageContent.replace("# __LAMBDA_PLACEHOLDER__", lambdaContent);
         }
     }
 
@@ -2906,7 +2917,7 @@ async function generateSnippetLocally() {
         lines.splice(markerIndex, 1, ...fontLines);
     }
 
-    // Correctly return joined lines without appending script again (since we injected it earlier)
+    // Correctly return joined lines
     const finalYaml = lines.join("\n");
 
     // ==========================================================================
@@ -2923,23 +2934,41 @@ async function generateSnippetLocally() {
 
 function generateScriptSection(payload, pagesLocal, profile = {}) {
     const lines = [];
-    // Determine display ID based on device type (LCD vs e-paper)
     const displayId = profile.features?.lcd ? "my_display" : "epaper_display";
+
+    // Start the script section
+    lines.push("script:");
+
+    // Centralized page-switching script helper
+    lines.push(...generateChangePageScript(pagesLocal, displayId));
 
     // Manual refresh only mode - minimal script
     if (payload.manual_refresh_only) {
-        lines.push("script:");
         lines.push("  - id: manage_run_and_sleep");
         lines.push("    mode: restart");
         lines.push("    then:");
+        lines.push(`      - component.update: ${displayId}`);
         lines.push("      - logger.log: \"Manual refresh only mode. Auto-refresh loop disabled.\"");
         return lines.join("\n");
     }
 
+    // Auto-cycle interval check
+    if (payload.auto_cycle_enabled && pagesLocal.length > 1) {
+        const cycleInterval = parseInt(payload.auto_cycle_interval_s || 30, 10);
+        lines.push("  - id: auto_cycle_timer");
+        lines.push("    then:");
+        lines.push("      - lambda: |-");
+        lines.push("          uint32_t now = millis();");
+        lines.push(`          uint32_t interval_ms = ${cycleInterval} * 1000;`);
+        lines.push("          if (now - id(last_page_switch_time) >= interval_ms) {");
+        lines.push("            id(change_page_to).execute(id(display_page) + 1);");
+        lines.push("          }");
+        lines.push("      - delay: 1s");
+        lines.push("      - script.execute: auto_cycle_timer");
+    }
+
     // CoreInk: Use activity_timer script with stay_awake_mode logic
-    // CoreInk has its own complete script block, so we return early
-    if (profile.name && profile.name.includes("CoreInk")) {
-        lines.push("script:");
+    if ((profile.name && profile.name.includes("CoreInk")) || profile.model === "m5stack_coreink") {
         lines.push("  - id: activity_timer");
         lines.push("    mode: restart");
         lines.push("    then:");
@@ -3001,9 +3030,7 @@ function generateScriptSection(payload, pagesLocal, profile = {}) {
         return lines.join("\n");
     }
 
-    // Deep Sleep mode - simple script block REMOVED to support smart intervals
-
-    // Build per-page interval cases
+    // Build per-page interval cases logic
     const casesLines = [];
     for (let idx = 0; idx < pagesLocal.length; idx++) {
         const page = pagesLocal[idx];
@@ -3033,201 +3060,35 @@ function generateScriptSection(payload, pagesLocal, profile = {}) {
         }
     }
 
-    const casesBlock = casesLines.length > 0
-        ? casesLines.join("\n")
-        : "                  default:\n                    break;";
-
-    // Sleep logic (Night Mode) - If Deep Sleep is enabled globally, we ignore this specific "Night Mode" sleep
-    // because we sleep essentially all the time. But we might want to skip updates.
-    // For simplicity, if deep_sleep_enabled is YES, we rely on the main loop's deep sleep.
-    // We only keep the "Active Mode" logic if deep sleep is NOT enabled.
-
-    let sleepLogic = "";
-
-    if (payload.daily_refresh_enabled) {
-        const [h, m] = (payload.daily_refresh_time || "08:00").split(':').map(Number);
-        sleepLogic = `
-      # Daily Scheduled Refresh Check (${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')})
-      - if:
-          condition:
-            lambda: |-
-              auto now = id(ha_time).now();
-              int target_s = ${h} * 3600 + ${m} * 60;
-              int current_s = now.hour * 3600 + now.minute * 60 + now.second;
-              // Return true if we are in the 1-minute window of the target time
-              return (abs(current_s - target_s) < 60);
-          then:
-            - component.update: ${displayId}
-            - delay: 8s
-            - lambda: 'id(page_refresh_current_s) = 86400;' # Sleep for 24h after success
-            ${payload.deep_sleep_enabled ? "- script.execute: enter_deep_sleep" : "- delay: 86400s\n            - script.execute: manage_run_and_sleep"}
-          else:
-            - lambda: |-
-                auto now = id(ha_time).now();
-                int target_s = ${h} * 3600 + ${m} * 60;
-                int current_s = now.hour * 3600 + now.minute * 60 + now.second;
-                if (current_s >= target_s) target_s += 86400;
-                id(page_refresh_current_s) = target_s - current_s;
-                ESP_LOGI("daily", "Not time yet. Waiting %d seconds until %02d:%02d", (int)id(page_refresh_current_s), ${h}, ${m});
-            ${payload.deep_sleep_enabled ? "- script.execute: enter_deep_sleep" : "- delay: !lambda 'return id(page_refresh_current_s) * 1000;'\n            - script.execute: manage_run_and_sleep"}
-`;
-    } else if (payload.sleep_enabled) {
-        const startH = parseInt(payload.sleep_start_hour || 0, 10);
-        const endH = parseInt(payload.sleep_end_hour || 5, 10);
-
-        // Handle wrap-around time (e.g. 22:00 to 06:00)
-        const condition = startH > endH
-            ? `(now.hour >= ${startH} || now.hour < ${endH})`
-            : `(now.hour >= ${startH} && now.hour < ${endH})`;
-
-        sleepLogic = `
-      # Night Mode Check (${String(startH).padStart(2, '0')}:00 - ${String(endH).padStart(2, '0')}:00)
-      - if:
-          condition:
-            lambda: |-
-              auto now = id(ha_time).now();
-              if (!now.is_valid()) return false;
-              return ${condition};
-          then:
-            - logger.log: "Night Mode: Sleeping until next hour boundary."
-            - lambda: |-
-                auto now = id(ha_time).now();
-                // Calculate seconds until the top of the next hour
-                int seconds_to_next_hour = 3600 - (now.minute * 60 + now.second);
-                if (seconds_to_next_hour < 60) seconds_to_next_hour = 3600; // Case for exactly on the hour
-                
-                id(page_refresh_current_s) = seconds_to_next_hour;
-            ${payload.deep_sleep_enabled ? "- script.execute: enter_deep_sleep" : "- delay: !lambda 'return id(page_refresh_current_s) * 1000;'\n            - script.execute: manage_run_and_sleep"}
-          
-          # Active Mode
-          else:`;
-    } else {
-        // No sleep mode
-        sleepLogic = `
-      # Regular Run
-      - if:
-          condition:
-            lambda: 'return !id(ha_time).now().is_valid();'
-          then:
-            - delay: 2000ms
-            - script.execute: manage_run_and_sleep
-          else:`;
-    }
-
-    // No-refresh window logic
-    let noRefreshLogic = "";
-    const nrStart = payload.no_refresh_start_hour;
-    const nrEnd = payload.no_refresh_end_hour;
-
-    if (nrStart !== undefined && nrStart !== null && nrEnd !== undefined && nrEnd !== null) {
-        const sH = parseInt(nrStart, 10);
-        const eH = parseInt(nrEnd, 10);
-        // Only generate if start != end (avoid 0-0 case)
-        if (!isNaN(sH) && !isNaN(eH) && sH !== eH) {
-            const cond = sH > eH
-                ? `(now.hour >= ${sH} || now.hour < ${eH})`
-                : `(now.hour >= ${sH} && now.hour < ${eH})`;
-
-            noRefreshLogic = `
-            - if:
-                condition:
-                  lambda: |-
-                    auto now = id(ha_time).now();
-                    return now.is_valid() && ${cond};
-                then:
-                  - logger.log: "In no-refresh window. Skipping display update."
-                  ${payload.deep_sleep_enabled ? "- deep_sleep.enter: { id: deep_sleep_1, sleep_duration: 60min }" : "- delay: 60s\n                  - script.execute: manage_run_and_sleep"}
-            `;
-        }
-    }
-
-    // Build image trigger logic
-    const imageCases = [];
-    for (let idx = 0; idx < pagesLocal.length; idx++) {
-        const page = pagesLocal[idx];
-        const pageImages = [];
-        if (page.widgets) {
-            for (const w of page.widgets) {
-                const t = (w.type || "").toLowerCase();
-                if (t === "online_image") {
-                    pageImages.push(`online_image_${w.id}`.replace(/-/g, "_"));
-                } else if (t === "puppet") {
-                    pageImages.push(`puppet_${w.id}`.replace(/-/g, "_"));
-                }
-            }
-        }
-        if (pageImages.length > 0) {
-            const updates = pageImages.map(pid => `id(${pid}).update();`).join(" ");
-            imageCases.push(`                  case ${idx}: ${updates} triggered = true; break;`);
-        }
-    }
-
-    let updateLambda = "";
-    if (imageCases.length > 0) {
-        updateLambda = [
-            "            - lambda: |-",
-            "                bool triggered = false;",
-            "                int page = id(display_page);",
-            "                switch (page) {",
-            imageCases.join("\n"),
-            "                }",
-            "                if (!triggered) {",
-            "                  id(${displayId}).update();",
-            "                }"
-        ].join("\n");
-    } else {
-        updateLambda = `            - component.update: ${displayId}`;
-    }
-
-    // Assemble the full script
-    lines.push("script:");
+    // Main Run and Sleep script
     lines.push("  - id: manage_run_and_sleep");
     lines.push("    mode: restart");
     lines.push("    then:");
-    lines.push("      - logger.log: \"Waiting for sync (Generic/E1001)...\"");
+    lines.push("      - logger.log: \"Waiting for sync...\"");
     lines.push("      - wait_until:");
     lines.push("          condition:");
     lines.push("            lambda: 'return id(ha_time).now().is_valid() && api_is_connected();'");
     lines.push("          timeout: 60s");
-    lines.push("      - delay: 5s # Grace period for data propagation");
+    lines.push("      - delay: 5s");
 
-    // Safety Fallback for Time Sync failure (prevent boot loops)
-    lines.push("      - lambda: |-");
-    lines.push("          if (!id(ha_time).now().is_valid()) {");
-    lines.push("            ESP_LOGW(\"script\", \"Time sync failed/invalid! Sleeping for 1 hour to retry.\");");
-    if (payload.deep_sleep_enabled || profile.model === "m5stack_coreink" || (profile.name && profile.name.includes("CoreInk"))) {
-        lines.push("            id(deep_sleep_1).set_sleep_duration(3600 * 1000);");
+    if (casesLines.length > 0) {
+        lines.push("      - lambda: |-");
+        lines.push("          int interval = id(page_refresh_default_s);");
+        lines.push("          switch(id(display_page)) {");
+        lines.push(...casesLines);
+        lines.push("          }");
+        lines.push("          id(page_refresh_current_s) = interval;");
+    } else {
+        lines.push("      - lambda: 'id(page_refresh_current_s) = id(page_refresh_default_s);'");
     }
-    lines.push("            return;");
-    lines.push("          }");
 
-    lines.push(sleepLogic);
+    lines.push(`      - component.update: ${displayId}`);
 
-    // If Daily Refresh is active, it handles its own update and sleep cycle,
-    // so we skip the standard "Active Mode" logic.
-    if (!payload.daily_refresh_enabled) {
-        lines.push("            - lambda: |-");
-        lines.push("                int page = id(display_page);");
-        lines.push("                int interval = id(page_refresh_default_s);");
-        lines.push("                switch (page) {");
-        lines.push(casesBlock);
-        lines.push("                }");
-        lines.push("                if (interval < 60) {");
-        lines.push("                  interval = 60;");
-        lines.push("                }");
-        lines.push("                id(page_refresh_current_s) = interval;");
-        lines.push("                ESP_LOGI(\"refresh\", \"Next refresh in %d seconds for page %d\", interval, page);");
-        lines.push("            ");
-        lines.push(noRefreshLogic);
-        lines.push(updateLambda);
-        lines.push("      ");
-
-        if (payload.deep_sleep_enabled || profile.model === "m5stack_coreink" || (profile.name && profile.name.includes("CoreInk"))) {
-            lines.push("            - script.execute: enter_deep_sleep");
-        } else {
-            lines.push("            - delay: !lambda 'return id(page_refresh_current_s) * 1000;'");
-            lines.push("            - script.execute: manage_run_and_sleep");
-        }
+    if (payload.deep_sleep_enabled) {
+        lines.push("      - script.execute: enter_deep_sleep");
+    } else {
+        lines.push("      - delay: !lambda 'return id(page_refresh_current_s) * 1000;'");
+        lines.push("      - script.execute: manage_run_and_sleep");
     }
 
     // Add helper script for deep sleep entry to keep code DRY
@@ -3242,6 +3103,33 @@ function generateScriptSection(payload, pagesLocal, profile = {}) {
     }
 
     return lines.join("\n");
+}
+
+/**
+ * Generates the centralized page-switching script.
+ */
+function generateChangePageScript(pages, displayId) {
+    const lines = [];
+    lines.push("  - id: change_page_to");
+    lines.push("    parameters:");
+    lines.push("      target_page: int");
+    lines.push("    then:");
+    lines.push("      - lambda: |-");
+    lines.push(`          int pages_count = ${pages.length};`);
+    lines.push("          int target = target_page;");
+    lines.push("          while (target < 0) target += pages_count;");
+    lines.push("          target %= pages_count;");
+    lines.push("          ");
+    lines.push("          if (id(display_page) != target) {");
+    lines.push("            id(display_page) = target;");
+    lines.push("            id(last_page_switch_time) = millis();");
+    lines.push(`            id(${displayId}).update();`);
+    lines.push("            ESP_LOGI(\"display\", \"Switched to page %d\", target);");
+    lines.push("            // Restart refresh logic");
+    lines.push("            if (id(manage_run_and_sleep).is_running()) id(manage_run_and_sleep).stop();");
+    lines.push("            id(manage_run_and_sleep).execute();");
+    lines.push("          }");
+    return lines;
 }
 
 // Global variables for snippet highlighting
@@ -3260,7 +3148,7 @@ function highlightWidgetInSnippet(widgetId) {
     if (!yaml) return;
 
     // Search for the widget ID in the comments
-    // Format: // widget:type id:w_123 ...
+    // Format: # widget:type id:w_123 ...
     const targetStr = `id:${widgetId} `;
     const index = yaml.indexOf(targetStr);
 
@@ -3269,7 +3157,7 @@ function highlightWidgetInSnippet(widgetId) {
         const lineStart = yaml.lastIndexOf('\n', index) + 1;
 
         // Find the next widget marker to determine block end
-        const nextWidgetIndex = yaml.indexOf("// widget:", index + targetStr.length);
+        const nextWidgetIndex = yaml.indexOf("# widget:", index + targetStr.length);
         let blockEnd = nextWidgetIndex !== -1 ? nextWidgetIndex : yaml.length;
 
         // If there's a next widget, back up to the previous newline to avoid selecting the next widget's comment
@@ -3334,7 +3222,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// Expose globally
 // Expose globally
 window.generateSnippetLocally = generateSnippetLocally;
 window.highlightWidgetInSnippet = highlightWidgetInSnippet;
