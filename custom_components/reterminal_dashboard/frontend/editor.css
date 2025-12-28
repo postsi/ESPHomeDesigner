@@ -599,6 +599,7 @@ textarea:focus {
   border: none;
   background: transparent;
   padding: 0;
+  touch-action: none;
 }
 
 .widget.active {
@@ -620,6 +621,7 @@ textarea:focus {
   align-items: center;
   justify-content: center;
   z-index: 10;
+  pointer-events: auto;
 }
 
 .widget-resize-handle::after {
@@ -650,6 +652,8 @@ textarea:focus {
   left: 0;
   right: 0;
 }
+
+/* Long-press visual feedback removed - replaced by Select-First interaction */
 
 .right-panel h3 {
   margin: 4px 0 8px 0;
