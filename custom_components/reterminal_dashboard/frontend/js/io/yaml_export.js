@@ -442,32 +442,32 @@ async function generateSnippetLocally() {
     lines.push("  - id: display_page");
     lines.push("    type: int");
     lines.push("    restore_value: true");
-    lines.push("    initial_value: '0'");
+    lines.push("    initial_value: 0");
 
     lines.push("  - id: page_refresh_default_s");
     lines.push("    type: int");
     lines.push("    restore_value: true");
     // LCD devices should refresh quickly; e-paper/battery devices can use longer intervals
     const defaultRefreshInterval = payload.refresh_interval || (isLcd ? 60 : (payload.deep_sleep_interval || 600));
-    lines.push(`    initial_value: '${defaultRefreshInterval}'`);
+    lines.push(`    initial_value: ${defaultRefreshInterval}`);
 
     lines.push("  - id: page_refresh_current_s");
     lines.push("    type: int");
     lines.push("    restore_value: false");
-    lines.push("    initial_value: '60'");
+    lines.push("    initial_value: 60");
 
     // Track last page switch time for auto-cycle
     lines.push("  - id: last_page_switch_time");
     lines.push("    type: uint32_t");
     lines.push("    restore_value: false");
-    lines.push("    initial_value: '0'");
+    lines.push("    initial_value: 0");
 
     // CoreInk: Add stay_awake_mode global for Prevent Sleep feature
     if (getDeviceModel() === "m5stack_coreink") {
         lines.push("  - id: stay_awake_mode");
         lines.push("    type: bool");
         lines.push("    restore_value: true");
-        lines.push("    initial_value: 'false'");
+        lines.push("    initial_value: false");
     }
 
     quoteRssWidgetsEarly.forEach(w => {
@@ -3143,6 +3143,7 @@ function generateScriptSection(payload, pagesLocal, profile = {}) {
     if (payload.auto_cycle_enabled && pagesLocal.length > 1) {
         const cycleInterval = parseInt(payload.auto_cycle_interval_s || 30, 10);
         lines.push("  - id: auto_cycle_timer");
+        lines.push("    mode: restart");
         lines.push("    then:");
         lines.push("      - lambda: |-");
         lines.push("          uint32_t now = millis();");
