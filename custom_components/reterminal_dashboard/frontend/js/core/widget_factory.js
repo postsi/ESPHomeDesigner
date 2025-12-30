@@ -517,7 +517,7 @@ class WidgetFactory {
             case "calendar":
                 // Standard size for a calendar widget
                 widget.width = 400;
-                widget.height = 550;
+                widget.height = 350;
                 widget.props = {
                     entity_id: "sensor.esp_calendar_data",
                     border_width: 2,

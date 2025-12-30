@@ -160,19 +160,19 @@ text_sensor:
           int cx = ${x} + (${w} / 2);
           
           // Date
-          it.printf(cx, ${y} + 5, id(font_roboto_100), color_content, TextAlign::TOP_CENTER, "%d", time.day_of_month);
-          it.printf(cx, ${y} + 85, id(font_roboto_24), color_content, TextAlign::TOP_CENTER, "%s", id(todays_day_name_${id}).state.c_str());
-          it.printf(cx, ${y} + 110, id(font_roboto_14), color_content, TextAlign::TOP_CENTER, "%s", id(todays_date_month_year_${id}).state.c_str());
+          it.printf(cx, ${y} + 0, id(font_roboto_100), color_content, TextAlign::TOP_CENTER, "%d", time.day_of_month);
+          it.printf(cx, ${y} + 70, id(font_roboto_24), color_content, TextAlign::TOP_CENTER, "%s", id(todays_day_name_${id}).state.c_str());
+          it.printf(cx, ${y} + 92, id(font_roboto_14), color_content, TextAlign::TOP_CENTER, "%s", id(todays_date_month_year_${id}).state.c_str());
           
           // Calendar Grid
-          int calendar_y_pos = ${y} + 135;
+          int calendar_y_pos = ${y} + 115;
           
           // 2. Mock-ish Calendar Rendering for ESPHome (simplified from reference)
           char cal[7][7][3];
           get_calendar_matrix(time.year, time.month, cal);
           
           int cell_width = (${w} - 40) / 7;
-          int cell_height = 20;
+          int cell_height = 17;
           int start_x = ${x} + 20;
           
           for (int i = 0; i < 7; i++) {
@@ -199,14 +199,14 @@ text_sensor:
           // Requires built-in JSON support in ESPHome (json component)
           // Data source: id(calendar_json_${id}).state
           
-           json::parse_json(id(calendar_json_${id}).state, [&](JsonObject root) -> bool {
+           json::parse_json(id(calendar_json_${id}).state, [&](JsonVariant root) -> bool {
                JsonArray entries = root.as<JsonArray>();
                 int y_cursor = calendar_y_pos + (7 * cell_height) + 10;
                 
                 it.line(${x} + 20, y_cursor - 5, ${x} + ${w} - 20, y_cursor - 5, color_content);
                 
                 for (JsonVariant entry : entries) {
-                    if (y_cursor > ${y} + ${h} - 30) break;
+                    if (y_cursor > ${y} + ${h} - 5) break;
                     
                     const char* summary = entry["summary"]; // "Meeting"
                     const char* start = entry["start"]; // "2023-10-10T10:00:00"

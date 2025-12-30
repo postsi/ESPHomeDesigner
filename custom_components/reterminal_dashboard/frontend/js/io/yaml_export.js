@@ -711,13 +711,27 @@ async function generateSnippetLocally() {
                 const safeId = condEnt.replace(/[^a-zA-Z0-9_]/g, "_");
 
                 // Determine if it's a text sensor or binary sensor
-                const isText = condEnt.startsWith("text_sensor.");
+                let isText = condEnt.startsWith("text_sensor.");
                 const isBinary = condEnt.startsWith("binary_sensor.");
+
+                // Implicit Text Sensor Detection: 
+                // If condition state is a non-numeric string and not a boolean keyword, assume it's a text sensor.
+                if (!isText && !isBinary && (w.condition_operator !== "range")) {
+                    const cState = (w.condition_state || "").trim().toLowerCase();
+                    const numeric = parseFloat(cState);
+                    const booleanKeywords = ["on", "off", "true", "false", "open", "closed", "locked", "unlocked", "home", "not_home", "occupied", "clear", "active", "inactive", "detected", "idle"];
+
+                    if (w.condition_state && isNaN(numeric) && !booleanKeywords.includes(cState)) {
+                        isText = true;
+                    }
+                }
 
                 if (isText) {
                     if (!processedTextSensorEntities.has(condEnt)) {
                         processedTextSensorEntities.add(condEnt);
                         haTextSensorLines.push(`  - platform: homeassistant`);
+                        // Ensure ID is unique and valid
+                        // If implicit, we still use _txt suffix to distinguish from potential numeric version
                         haTextSensorLines.push(`    id: ${safeId}_txt`);
                         haTextSensorLines.push(`    entity_id: ${condEnt}`);
                         haTextSensorLines.push(`    internal: true`);
@@ -1595,16 +1609,31 @@ async function generateSnippetLocally() {
                 const safeId = ent.replace(/[^a-zA-Z0-9_]/g, "_");
 
                 // Determine sensor type/source
+                const isTextExplicit = ent.startsWith("text_sensor.");
+                const isBinary = ent.startsWith("binary_sensor.");
+                let isText = isTextExplicit;
+
+                // Implicit Text Sensor Detection
+                if (!isText && !isBinary && op !== "range") {
+                    const numeric = parseFloat(state);
+                    const booleanKeywords = ["on", "off", "true", "false", "open", "closed", "locked", "unlocked", "home", "not_home", "occupied", "clear", "active", "inactive", "detected", "idle"];
+                    if (state && isNaN(numeric) && !booleanKeywords.includes(stateLower)) {
+                        isText = true;
+                    }
+                }
+
                 let valExpr = `id(${safeId}).state`;
-                if (ent.startsWith("text_sensor.")) {
+                if (isText) {
+                    // Check if we treated it as text sensor in import section (which adds _txt suffix)
+                    // Yes, if we detected it as text, we used _txt suffix
                     valExpr = `id(${safeId}_txt).state`;
-                } else if (ent.startsWith("binary_sensor.")) {
+                } else if (isBinary) {
                     valExpr = `id(${safeId}_bin).state`;
                 }
 
                 let cond = "";
                 if (op === "==" || op === "!=" || op === ">" || op === "<" || op === ">=" || op === "<=") {
-                    if (ent.startsWith("text_sensor.")) {
+                    if (isText) {
                         cond = `${valExpr} ${op} "${state}"`;
                     } else if (ent.startsWith("binary_sensor.")) {
                         // Expanded HA Binary Sensor States
@@ -2730,17 +2759,17 @@ async function generateSnippetLocally() {
                             lines.push(`          int cx = ${w.x} + (${w.width} / 2);`);
 
                             // Header: Date
-                            lines.push(`          it.printf(cx, ${w.y} + 5, id(${fontBig}), ${color}, TextAlign::TOP_CENTER, "%d", time.day_of_month);`);
-                            lines.push(`          it.printf(cx, ${w.y} + 85, id(${fontDay}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_day_name_${safeWidgetId}).state.c_str());`);
-                            lines.push(`          it.printf(cx, ${w.y} + 110, id(${fontDate}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_date_month_year_${safeWidgetId}).state.c_str());`);
+                            lines.push(`          it.printf(cx, ${w.y} + 0, id(${fontBig}), ${color}, TextAlign::TOP_CENTER, "%d", time.day_of_month);`);
+                            lines.push(`          it.printf(cx, ${w.y} + 70, id(${fontDay}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_day_name_${safeWidgetId}).state.c_str());`);
+                            lines.push(`          it.printf(cx, ${w.y} + 92, id(${fontDate}), ${color}, TextAlign::TOP_CENTER, "%s", id(todays_date_month_year_${safeWidgetId}).state.c_str());`);
 
                             // Calendar Grid
-                            lines.push(`          int calendar_y_pos = ${w.y} + 135;`);
+                            lines.push(`          int calendar_y_pos = ${w.y} + 115;`);
                             lines.push(`          char cal[7][7][3];`);
                             lines.push(`          get_calendar_matrix(time.year, time.month, cal);`);
 
                             lines.push(`          int cell_width = (${w.width} - 40) / 7;`);
-                            lines.push(`          int cell_height = 20;`);
+                            lines.push(`          int cell_height = 17;`);
                             lines.push(`          int start_x = ${w.x} + 20;`);
 
                             lines.push(`          for (int i = 0; i < 7; i++) {`);
@@ -2787,8 +2816,8 @@ async function generateSnippetLocally() {
                             lines.push(`                  }`);
                             lines.push(`                  ESP_LOGD("calendar", "Processing %d days", days.size());`);
                             lines.push(``);
-                            lines.push(`                  int y_cursor = calendar_y_pos + (7 * cell_height) + 15;`);
-                            lines.push(`                  int max_y = ${w.y} + ${w.height} - 30;`);
+                            lines.push(`                  int y_cursor = calendar_y_pos + (7 * cell_height) + 10;`);
+                            lines.push(`                  int max_y = ${w.y} + ${w.height} - 5;`);
                             lines.push(``);
                             lines.push(`                  // Safety: Ensure we have enough space for at least one event`);
                             lines.push(`                  if (y_cursor >= max_y) { ESP_LOGW("calendar", "Widget too small for events"); return true; }`);
@@ -2813,7 +2842,7 @@ async function generateSnippetLocally() {
                             lines.push(`                              std::string timeStr = extract_time(start);`);
                             lines.push(`                              it.printf(${w.x} + ${w.width} - 20, y_cursor + 4, id(${fontEvent}), ${color}, TextAlign::TOP_RIGHT, "%s", timeStr.c_str());`);
                             lines.push(`                          }`);
-                            lines.push(`                          y_cursor += 30;`);
+                            lines.push(`                          y_cursor += 25;`);
                             lines.push(`                      };`);
                             lines.push(``);
                             lines.push(`                      if (dayEntry.containsKey("all_day")) {`);
