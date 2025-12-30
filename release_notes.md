@@ -14,6 +14,8 @@
 - **New Hardware Support**: Added support for the **WaveShare Universal ESP32 epaper driver board** and **7.5" v2 display** via hardware recipes. Many thanks to **EmilyNerdGirl** for contributing this recipe!
 - **Hardware Recipe Documentation**: Expanded the [Hardware Recipes Guide](https://github.com/koosoli/ESPHomeDesigner/blob/main/hardware_recipes_guide.md) with comprehensive documentation for all supported metadata tags, including `# Orientation`, `# Dark Mode`, and `# Refresh Interval`.
 - **Full Conditional Visibility Support**: All widget types now support conditional rendering based on Home Assistant entity states (binary, numeric, text, and range). The designer automatically generates the required Home Assistant sensors and optimized C++ `if` blocks in the display lambda.
+- **Improved Smart Condition Logic**: Enhanced sensor state detection for both binary and numeric sensors. The generator now recognizes expanded Home Assistant states like `open`, `locked`, `home`, and `active` as positive (true) values, and provides intelligent fallbacks for numeric sensors using common string labels.
+
 
 ### 🐛 Bug Fixes
 - **Custom Resolution Import Fix**: Resolved a critical issue where custom resolutions from hardware recipes were ignored during import, resetting the canvas to 800x480.
@@ -29,7 +31,8 @@
 - **Display Lambda Header Injection**: Fixed a critical bug where the `lambda: |-` header was incorrectly omitted if the string was found anywhere else in the file (e.g. in comments or other components). The generator now strictly checks for the header specifically preceding the lambda placeholder, ensuring valid YAML syntax for all display configurations.
 - **Widget Visibility Logic Fix**: Resolved a long-standing issue where conditional visibility rules were ignored during YAML export. The implementation now correctly generates re-import metadata (shorthand keys) and ensures sanitized sensor IDs are used throughout the C++ rendering logic.
 - **Waveshare 7" LCD Orientation Fix**: Implemented a dynamic package override mechanism to allow rotating the Waveshare 7" LCD (Landscape, Portrait, Inverted). Also added automatic touchscreen `transform` mapping to ensure touch inputs align with the rotated display.
-- **Calendar Widget**: Fixed event display issues by implementing robust JSON parsing that supports both nested  `{"days": [...]}` and legacy flat array formats. Added extensive debug logging and null safety checks to preventing crashes with malformed data.
+- **Quote Widget Regression Fix**: Resolved a regression where quotes failed to fetch and display on-device. Restored the missing `interval` and `http_request` fetch logic, updated to use robust `DynamicJsonDocument` parsing for reliability, and ensuring immediate visual feedback via a forced display update.
+- **Calendar Widget Fix**: Resolved a critical issue where calendar events were not displayed on-device. Replaced `json::parse_json` with robust manual `deserializeJson` parsing using a heap-allocated `DynamicJsonDocument` (2KB), and introduced a **"Compact Mode"** layout that aggressively reduces header and grid spacing to maximize event visibility on smaller widgets.
 
 ---
 
