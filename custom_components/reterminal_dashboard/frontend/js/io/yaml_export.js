@@ -557,6 +557,8 @@ async function generateSnippetLocally() {
     const processedSensorIds = new Set(); // For numeric sensors
     const processedTextSensorEntities = new Set(); // For text sensors
     const haTextSensorLines = []; // For text_sensor HA imports
+    const processedBinarySensorEntities = new Set(); // For binary sensors
+    const binarySensorLines = []; // For binary_sensor HA imports
 
     pagesLocal.forEach(p => {
         if (!p.widgets) return;
@@ -701,6 +703,45 @@ async function generateSnippetLocally() {
                 }
             }
 
+            // --- CONDITION ENTITIES ---
+            // If widget has a visibility condition based on an external HA entity,
+            // we must ensure that entity is imported into ESPHome.
+            const condEnt = (w.condition_entity || "").trim();
+            if (condEnt && !condEnt.startsWith("weather.")) {
+                const safeId = condEnt.replace(/[^a-zA-Z0-9_]/g, "_");
+
+                // Determine if it's a text sensor or binary sensor
+                const isText = condEnt.startsWith("text_sensor.");
+                const isBinary = condEnt.startsWith("binary_sensor.");
+
+                if (isText) {
+                    if (!processedTextSensorEntities.has(condEnt)) {
+                        processedTextSensorEntities.add(condEnt);
+                        haTextSensorLines.push(`  - platform: homeassistant`);
+                        haTextSensorLines.push(`    id: ${safeId}_txt`);
+                        haTextSensorLines.push(`    entity_id: ${condEnt}`);
+                        haTextSensorLines.push(`    internal: true`);
+                    }
+                } else if (isBinary) {
+                    if (!processedBinarySensorEntities.has(condEnt)) {
+                        processedBinarySensorEntities.add(condEnt);
+                        binarySensorLines.push(`  - platform: homeassistant`);
+                        binarySensorLines.push(`    id: ${safeId}_bin`);
+                        binarySensorLines.push(`    entity_id: ${condEnt}`);
+                        binarySensorLines.push(`    internal: true`);
+                    }
+                } else {
+                    // Numeric / Generic
+                    if (!processedSensorIds.has(condEnt)) {
+                        processedSensorIds.add(condEnt);
+                        widgetSensorLines.push(`  - platform: homeassistant`);
+                        widgetSensorLines.push(`    id: ${safeId}`);
+                        widgetSensorLines.push(`    entity_id: ${condEnt}`);
+                        widgetSensorLines.push(`    internal: true`);
+                    }
+                }
+            }
+
         });
     });
 
@@ -768,8 +809,18 @@ async function generateSnippetLocally() {
 
 
 
-    // 7. Binary Sensors (Buttons + Touch Areas)
-    lines.push(...generateBinarySensorSection(profile, pagesLocal.length, displayId, touchAreaWidgets));
+    // 7. Binary Sensors (Buttons + Touch Areas + HA Condition Entities)
+    const binarySensors = generateBinarySensorSection(profile, pagesLocal.length, displayId, touchAreaWidgets);
+    if (binarySensors.length > 0) {
+        if (binarySensorLines.length > 0) {
+            binarySensors.push(...binarySensorLines);
+        }
+        lines.push(...binarySensors);
+    } else if (binarySensorLines.length > 0) {
+        lines.push("binary_sensor:");
+        lines.push(...binarySensorLines);
+        lines.push("");
+    }
 
     // 8. Buttons (Page Navigation Templates)
     lines.push(...generateButtonSection(profile, pagesLocal.length, displayId));
@@ -1519,8 +1570,63 @@ async function generateSnippetLocally() {
 
             // Generate valid condition checks
             const getCondProps = (w) => {
-                // Placeholder for conditional visibility if needed
-                return "";
+                // Return shorthand metadata for YAML re-import
+                if (!w.condition_entity) return "";
+                let s = ` cond_ent:"${w.condition_entity}" cond_op:"${w.condition_operator || "=="}"`;
+                if (w.condition_state) s += ` cond_state:"${w.condition_state}"`;
+                if (w.condition_min) s += ` cond_min:"${w.condition_min}"`;
+                if (w.condition_max) s += ` cond_max:"${w.condition_max}"`;
+                return s;
+            };
+
+            /**
+             * Generates a C++ if block for conditional visibility.
+             */
+            const getConditionCheck = (w) => {
+                const ent = (w.condition_entity || "").trim();
+                if (!ent) return "";
+
+                const op = w.condition_operator || "==";
+                const state = (w.condition_state || "").trim();
+                const minVal = w.condition_min;
+                const maxVal = w.condition_max;
+
+                const safeId = ent.replace(/[^a-zA-Z0-9_]/g, "_");
+
+                // Determine sensor type/source
+                let valExpr = `id(${safeId}).state`;
+                if (ent.startsWith("text_sensor.")) {
+                    valExpr = `id(${safeId}_txt).state`;
+                } else if (ent.startsWith("binary_sensor.")) {
+                    valExpr = `id(${safeId}_bin).state`;
+                }
+
+                let cond = "";
+                if (op === "==" || op === "!=" || op === ">" || op === "<" || op === ">=" || op === "<=") {
+                    if (ent.startsWith("text_sensor.")) {
+                        cond = `${valExpr} ${op} "${state}"`;
+                    } else if (ent.startsWith("binary_sensor.")) {
+                        const isTrue = state.toLowerCase() === "on" || state.toLowerCase() === "true" || state === "1";
+                        // For equality, we just use the value or negated value.
+                        if (op === "==") {
+                            cond = isTrue ? valExpr : `!${valExpr}`;
+                        } else {
+                            // op is !=
+                            cond = isTrue ? `!${valExpr}` : valExpr;
+                        }
+                    } else {
+                        // Numeric
+                        const numVal = parseFloat(state);
+                        cond = `${valExpr} ${op} ${isNaN(numVal) ? 0 : numVal}`;
+                    }
+                } else if (op === "range") {
+                    const minNum = parseFloat(minVal);
+                    const maxNum = parseFloat(maxVal);
+                    cond = `${valExpr} >= ${isNaN(minNum) ? 0 : minNum} && ${valExpr} <= ${isNaN(maxNum) ? 100 : maxNum}`;
+                }
+
+                if (!cond) return "";
+                return `if (${cond}) {`;
             };
 
             const RECT_Y_OFFSET = 0;
@@ -1747,10 +1853,13 @@ async function generateSnippetLocally() {
                             const align = p.text_align || "TOP_LEFT";
 
                             lines.push(`        // widget:text id:${w.id} type:text x:${w.x} y:${w.y} w:${w.width} h:${w.height} text:"${text}" font_family:"${family}" font_size:${size} font_weight:${weight} italic:${italic} color:${colorProp} text_align:${align} ${getCondProps(w)}`);
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
                             lines.push(`        it.printf(${alignX}, ${alignY}, id(${fontId}), ${color}, ${espAlign}, "${text}");`);
                             if (colorProp.toLowerCase() === "gray" || colorProp.toLowerCase() === "grey") {
                                 lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y + TEXT_Y_OFFSET}, ${w.width}, ${w.height});`);
                             }
+                            if (cond) lines.push(`        }`);
 
                         } else if (t === "sensor_text") {
                             // Read all properties correctly
@@ -1788,7 +1897,10 @@ async function generateSnippetLocally() {
                             const valueFontId = addFont(family, weight, valueFontSize, italic);
 
                             // Widget metadata comment - include all properties for round-trip persistence
-                            lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} ent:${entity} entity_2:${entity2} title:"${title}" format:${valueFormat} label_font:${labelFontSize} value_font:${valueFontSize} color:${colorProp} label_align:${align} value_align:${align} precision:${precision} unit:"${unit}" hide_unit:${!!p.hide_unit} prefix:"${prefix}" postfix:"${postfix}" separator:"${separator}" local:${isLocalSensor} text_sensor:${isTextSensor} font_family:"${family}" font_weight:${weight} italic:${italic}`);
+                            lines.push(`        // widget:sensor_text id:${w.id} type:sensor_text x:${w.x} y:${w.y} w:${w.width} h:${w.height} ent:${entity} entity_2:${entity2} title:"${title}" format:${valueFormat} label_font:${labelFontSize} value_font:${valueFontSize} color:${colorProp} label_align:${align} value_align:${align} precision:${precision} unit:"${unit}" hide_unit:${!!p.hide_unit} prefix:"${prefix}" postfix:"${postfix}" separator:"${separator}" local:${isLocalSensor} text_sensor:${isTextSensor} font_family:"${family}" font_weight:${weight} italic:${italic} ${getCondProps(w)}`);
+
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
 
                             // Calculate alignment coordinates including Vertical alignment
                             const alignY = getAlignY(align, w.y, w.height);
@@ -1893,12 +2005,15 @@ async function generateSnippetLocally() {
                             const color = getColorConst(colorProp);
                             const fontRef = addFont("Material Design Icons", 400, size);
                             lines.push(`        // widget:icon id:${w.id} type:icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} code:${code} size:${size} color:${colorProp} ${getCondProps(w)}`);
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
                             // Use printf for icons to handle unicode safely
                             lines.push(`        it.printf(${w.x}, ${w.y}, id(${fontRef}), ${color}, "%s", "\\U000${code}");`);
                             // Apply grey dithering if color is gray
                             if (colorProp.toLowerCase() === "gray") {
                                 lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${size}, ${size});`);
                             }
+                            if (cond) lines.push(`        }`);
 
                         } else if (t === "graph") {
                             const entityId = (w.entity_id || "").trim();
@@ -1962,6 +2077,9 @@ async function generateSnippetLocally() {
                             }
 
                             lines.push(`        // widget:graph id:${w.id} type:graph x:${w.x} y:${w.y} w:${w.width} h:${w.height} title:"${title}" entity:${entityId} local:${!!p.is_local_sensor} duration:${duration} border:${borderEnabled} color:${colorProp} x_grid:${xGrid} y_grid:${yGrid} line_type:${lineType} line_thickness:${lineThickness} continuous:${continuous} min_value:${minValue} max_value:${maxValue} min_range:${minRange} max_range:${maxRange} ${getCondProps(w)}`);
+
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
 
                             if (entityId) {
                                 // Pass color as 4th parameter? NO, standard Graph component does not support it.
@@ -2042,9 +2160,9 @@ async function generateSnippetLocally() {
                                     lines.push(`        it.printf(${w.x} + ${xOffset}, ${w.y} + ${w.height} + 2, id(font_roboto_400_12), ${color}, ${align}, "${labelText}");`);
                                 }
                             } else {
-                                lines.push(`        it.rectangle(${w.x}, ${w.y}, ${w.width}, ${w.height}, ${color});`);
                                 lines.push(`        it.printf(${w.x}+5, ${w.y}+5, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "Graph (no entity)");`);
                             }
+                            if (cond) lines.push(`        }`);
 
                         } else if (t === "progress_bar") {
                             const entityId = (w.entity_id || "").trim();
@@ -2058,6 +2176,8 @@ async function generateSnippetLocally() {
                             addFont("Roboto", 400, 12); // Progress bar uses small font for labels
 
                             lines.push(`        // widget:progress_bar id:${w.id} type:progress_bar x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${title}" show_label:${showLabel} show_pct:${showPercentage} bar_height:${barHeight} border:${borderWidth} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
 
                             if (entityId) {
                                 const safeId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
@@ -2085,6 +2205,7 @@ async function generateSnippetLocally() {
                                     lines.push(`        it.printf(${w.x}, ${w.y}, id(font_roboto_400_12), ${color}, TextAlign::TOP_LEFT, "${title}");`);
                                 }
                             }
+                            if (cond) lines.push(`        }`);
 
                         } else if (t === "battery" || t === "battery_icon") {
                             const entityId = (w.entity_id || "").trim();
@@ -2108,6 +2229,8 @@ async function generateSnippetLocally() {
                             }
 
                             lines.push(`        // widget:battery_icon id:${w.id} type:battery_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "battery_level"} size:${size} font_size:${fontSize} color:${colorProp} local:${!!p.is_local_sensor} ${getCondProps(w)}`);
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
                             lines.push(`        {`);
                             lines.push(`          const char* bat_icon = "\\U000F0082"; // Default: battery-outline (unknown)`);
                             lines.push(`          float bat_level = 0;`);
@@ -2133,6 +2256,7 @@ async function generateSnippetLocally() {
                                 lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
                             }
                             lines.push(`        }`);
+                            if (cond) lines.push(`        }`);
 
                         } else if (t === "wifi_signal") {
                             const entityId = (w.entity_id || "").trim();
@@ -2154,6 +2278,8 @@ async function generateSnippetLocally() {
                             }
 
                             lines.push(`        // widget:wifi_signal id:${w.id} type:wifi_signal x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || "wifi_signal_dbm"} size:${size} font_size:${fontSize} color:${colorProp} show_dbm:${showDbm} local:${isLocal} ${getCondProps(w)}`);
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
                             lines.push(`        {`);
                             lines.push(`          const char* wifi_icon = "\\U000F092B"; // Default: wifi-strength-alert-outline`);
                             lines.push(`          if (id(${sensorId}).has_state()) {`);
@@ -2207,7 +2333,11 @@ async function generateSnippetLocally() {
                             }
 
                             lines.push(`        // widget:ondevice_temperature id:${w.id} x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || sensorId} icon_size:${iconSize} font_size:${fontSize} color:${colorProp} local:${isLocal} ${getCondProps(w)}`);
+                            const cond = getConditionCheck(w);
+                            if (cond) lines.push(`        ${cond}`);
                             lines.push(`        {`);
+                            lines.push(`        }`);
+                            if (cond) lines.push(`        }`);
                             lines.push(`          const char* temp_icon = "\\U000F050F"; // Default: thermometer`);
                             lines.push(`          float temp_val = NAN;`);
 
@@ -2242,6 +2372,7 @@ async function generateSnippetLocally() {
                                 lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
                             }
                             lines.push(`        }`);
+                            if (cond) lines.push(`        }`);
 
                         } else if (t === "ondevice_humidity") {
                             const entityId = (w.entity_id || "").trim();
@@ -2271,6 +2402,8 @@ async function generateSnippetLocally() {
                             }
 
                             lines.push(`        // widget:ondevice_humidity id:${w.id} x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId || sensorId} icon_size:${iconSize} font_size:${fontSize} color:${colorProp} local:${isLocal} ${getCondProps(w)}`);
+                            const condHum = getConditionCheck(w);
+                            if (condHum) lines.push(`        ${condHum}`);
                             lines.push(`        {`);
                             lines.push(`          const char* hum_icon = "\\U000F058E"; // Default: water-percent`);
                             lines.push(`          float hum_val = NAN;`);
@@ -2305,6 +2438,7 @@ async function generateSnippetLocally() {
                                 lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
                             }
                             lines.push(`        }`);
+                            if (condHum) lines.push(`        }`);
 
                         } else if (t === "template_sensor_bar") {
                             const iconSize = parseInt(p.icon_size || 20, 10);
@@ -2323,7 +2457,8 @@ async function generateSnippetLocally() {
                             const textFontRef = addFont("Roboto", 500, fontSize);
 
                             lines.push(`        // widget:template_sensor_bar id:${w.id} type:template_sensor_bar x:${w.x} y:${w.y} w:${w.width} h:${w.height} wifi:${showWifi} temp:${showTemp} hum:${showHum} bat:${showBat} bg:${showBg} bg_color:${p.background_color || "black"} radius:${radius} icon_size:${iconSize} font_size:${fontSize} color:${colorProp} ${getCondProps(w)}`);
-
+                            const condSens = getConditionCheck(w);
+                            if (condSens) lines.push(`        ${condSens}`);
                             lines.push(`        {`);
                             if (showBg) {
                                 // Use bgColor for background
@@ -2407,6 +2542,7 @@ async function generateSnippetLocally() {
                                 lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
                             }
                             lines.push(`        }`);
+                            if (condSens) lines.push(`        }`);
 
                         } else if (t === "template_nav_bar") {
                             const iconSize = parseInt(p.icon_size || 24, 10);
@@ -2423,7 +2559,8 @@ async function generateSnippetLocally() {
                             const iconFontRef = addFont("Material Design Icons", 400, iconSize);
 
                             lines.push(`        // widget:template_nav_bar id:${w.id} type:template_nav_bar x:${w.x} y:${w.y} w:${w.width} h:${w.height} prev:${showPrev} home:${showHome} next:${showNext} bg:${showBg} bg_color:${p.background_color || "black"} radius:${radius} icon_size:${iconSize} color:${colorProp} ${getCondProps(w)}`);
-
+                            const condNav = getConditionCheck(w);
+                            if (condNav) lines.push(`        ${condNav}`);
                             lines.push(`        {`);
                             if (showBg) {
                                 // Use bgColor for background
@@ -2467,6 +2604,7 @@ async function generateSnippetLocally() {
                                 lines.push(`          apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
                             }
                             lines.push(`        }`);
+                            if (condNav) lines.push(`        }`);
 
                         } else if (t === "weather_icon") {
 
@@ -2477,6 +2615,8 @@ async function generateSnippetLocally() {
                             const color = getColorConst(colorProp);
                             const fontRef = addFont("Material Design Icons", 400, size);
                             lines.push(`        // widget:weather_icon id:${w.id} type:weather_icon x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} size:${size} color:${colorProp} ${getCondProps(w)}`);
+                            const condWeather = getConditionCheck(w);
+                            if (condWeather) lines.push(`        ${condWeather}`);
                             if (entityId) {
                                 const safeId = entityId.replace(/^sensor\./, "").replace(/\./g, "_").replace(/-/g, "_");
                                 // Generate dynamic weather icon mapping based on entity state
@@ -2511,8 +2651,7 @@ async function generateSnippetLocally() {
                                     lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${size}, ${size});`);
                                 }
                             }
-
-                            /* Removed duplicate calendar block */
+                            if (condWeather) lines.push(`        }`);
 
                         } else if (t === "calendar") {
                             const entityId = (p.entity_id || "sensor.esp_calendar_data").trim();
@@ -2546,6 +2685,8 @@ async function generateSnippetLocally() {
                             const fontEvent = addFont(fFamily, 400, szEvent); // summary
 
                             lines.push(`        // widget:calendar id:${w.id} type:calendar x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} border_width:${borderWidth} show_border:${showBorder} border_color:${borderColorProp} background_color:${bgColorProp} text_color:${colorProp} font_size_date:${szDate} font_size_day:${szDay} font_size_grid:${szGrid} font_size_event:${szEvent} ${getCondProps(w)}`);
+                            const condCal = getConditionCheck(w);
+                            if (condCal) lines.push(`        ${condCal}`);
                             lines.push(`        {`);
                             lines.push(`          auto time = id(ha_time).now();`);
 
@@ -2653,6 +2794,7 @@ async function generateSnippetLocally() {
                             lines.push(`             });`);
                             lines.push(`          }`);
                             lines.push(`        }`);
+                            if (condCal) lines.push(`        }`);
 
                         } else if (t === "qr_code") {
                             const value = (p.value || "https://esphome.io").replace(/"/g, '\\"');
@@ -2667,7 +2809,10 @@ async function generateSnippetLocally() {
                             const scale = Math.max(1, Math.floor(availableSize / estimatedModules));
 
                             lines.push(`        // widget:qr_code id:${w.id} type:qr_code x:${w.x} y:${w.y} w:${w.width} h:${w.height} value:"${value}" scale:${scale} ecc:${ecc} color:${colorProp} ${getCondProps(w)}`);
+                            const condQR = getConditionCheck(w);
+                            if (condQR) lines.push(`        ${condQR}`);
                             lines.push(`        it.qr_code(${w.x}, ${w.y}, id(${safeId}), ${color}, ${scale});`);
+                            if (condQR) lines.push(`        }`);
 
                         } else if (t === "touch_area") {
                             const entityId = (w.entity_id || "").trim();
@@ -2681,7 +2826,9 @@ async function generateSnippetLocally() {
                             const iconColorProp = w.props.icon_color || "black";
                             const iconColor = getColorConst(iconColorProp);
 
-                            lines.push(`        // widget:touch_area id:${w.id} type:touch_area x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${title}" color:"${color}" border_color:"${borderColor}" icon:"${w.props.icon || ""}" icon_pressed:"${w.props.icon_pressed || ""}" icon_size:${iconSize} icon_color:${iconColorProp} nav_action:"${w.props.nav_action || "none"}"`);
+                            lines.push(`        // widget:touch_area id:${w.id} type:touch_area x:${w.x} y:${w.y} w:${w.width} h:${w.height} entity:${entityId} title:"${title}" color:"${color}" border_color:"${borderColor}" icon:"${w.props.icon || ""}" icon_pressed:"${w.props.icon_pressed || ""}" icon_size:${iconSize} icon_color:${iconColorProp} nav_action:"${w.props.nav_action || "none"}" ${getCondProps(w)}`);
+                            const condTouch = getConditionCheck(w);
+                            if (condTouch) lines.push(`        ${condTouch}`);
 
                             if (icon) {
                                 const fontRef = addFont("Material Design Icons", 400, iconSize);
@@ -2701,6 +2848,7 @@ async function generateSnippetLocally() {
                                     lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y}, ${w.width}, ${w.height});`);
                                 }
                             }
+                            if (condTouch) lines.push(`        }`);
 
                         } else if (t === "quote_rss") {
                             const feedUrl = (p.feed_url || "https://www.brainyquote.com/link/quotebr.rss").replace(/"/g, '\\"');
@@ -2738,6 +2886,8 @@ async function generateSnippetLocally() {
                             }
 
                             lines.push(`        // widget:quote_rss id:${w.id} type:quote_rss x:${w.x} y:${w.y} w:${w.width} h:${w.height} feed_url:"${feedUrl}" show_author:${showAuthor} quote_font:${quoteFontSize} author_font:${authorFontSize} color:${colorProp} align:${textAlign} italic:${italicQuote} refresh:${refreshInterval} random:${randomQuote} wrap:${wordWrap} ${getCondProps(w)}`);
+                            const condQuote = getConditionCheck(w);
+                            if (condQuote) lines.push(`        ${condQuote}`);
                             lines.push(`        {`);
                             lines.push(`          std::string quote_text = id(${quoteTextId}_global);`);
                             if (showAuthor) {
@@ -2830,6 +2980,8 @@ async function generateSnippetLocally() {
                             const iconFontId = addFont("Material Design Icons", 400, iconSize);
 
                             lines.push(`        // widget:weather_forecast id:${w.id} type:weather_forecast x:${w.x} y:${w.y} w:${w.width} h:${w.height} weather_entity:"${weatherEntity}" layout:${layout} show_high_low:${showHighLow} day_font_size:${dayFontSize} temp_font_size:${tempFontSize} icon_size:${iconSize} font_family:"${fontFamily}" color:${colorProp} ${getCondProps(w)}`);
+                            const condFore = getConditionCheck(w);
+                            if (condFore) lines.push(`        ${condFore}`);
                             lines.push(`        {`);
                             lines.push(`          static std::map<std::string, const char*> weather_icons = {`);
                             lines.push(`            {"clear-night", "\\U000F0594"}, {"cloudy", "\\U000F0590"},`);
@@ -2896,6 +3048,8 @@ async function generateSnippetLocally() {
 
                             const rrectY = w.y + RECT_Y_OFFSET;
                             lines.push(`        // widget:rounded_rect id:${w.id} type:rounded_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} show_border:${showBorder} border:${thickness} radius:${r} color:${colorProp} border_color:${borderColorProp} ${getCondProps(w)}`);
+                            const condRRect = getConditionCheck(w);
+                            if (condRRect) lines.push(`        ${condRRect}`);
                             lines.push(`        {`);
 
                             if (fill) {
@@ -2945,6 +3099,7 @@ async function generateSnippetLocally() {
                                 lines.push(`          apply_grey_dither_mask(${w.x}, ${rrectY}, ${w.width}, ${w.height});`);
                             }
                             lines.push(`        }`);
+                            if (condRRect) lines.push(`        }`);
 
                         } else if (t === "shape_rect") {
                             const fill = !!p.fill;
@@ -2956,6 +3111,8 @@ async function generateSnippetLocally() {
                             const isGray = colorProp.toLowerCase() === "gray";
                             const rectY = w.y + RECT_Y_OFFSET;
                             lines.push(`        // widget:shape_rect id:${w.id} type:shape_rect x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} color:${colorProp} border_color:${borderColorProp} ${getCondProps(w)}`);
+                            const condSRect = getConditionCheck(w);
+                            if (condSRect) lines.push(`        ${condSRect}`);
                             if (fill) {
                                 if (isGray) {
                                     lines.push(`        apply_grey_dither_mask(${w.x}, ${rectY}, ${w.width}, ${w.height});`);
@@ -2970,6 +3127,7 @@ async function generateSnippetLocally() {
                             if (borderColorProp.toLowerCase() === "gray" && !fill) {
                                 lines.push(`        apply_grey_dither_mask(${w.x}, ${rectY}, ${w.width}, ${w.height});`);
                             }
+                            if (condSRect) lines.push(`        }`);
 
                         } else if (t === "shape_circle") {
                             const r = Math.min(w.width, w.height) / 2;
@@ -2983,6 +3141,8 @@ async function generateSnippetLocally() {
                             const borderColor = getColorConst(borderColorProp);
                             const isGray = colorProp.toLowerCase() === "gray";
                             lines.push(`        // widget:shape_circle id:${w.id} type:shape_circle x:${w.x} y:${w.y} w:${w.width} h:${w.height} fill:${fill} border:${borderWidth} color:${colorProp} border_color:${borderColorProp} ${getCondProps(w)}`);
+                            const condSCircle = getConditionCheck(w);
+                            if (condSCircle) lines.push(`        ${condSCircle}`);
                             if (fill) {
                                 if (isGray) {
                                     // circle dither
@@ -3004,6 +3164,7 @@ async function generateSnippetLocally() {
                                     lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y + RECT_Y_OFFSET}, ${w.width}, ${w.height});`);
                                 }
                             }
+                            if (condSCircle) lines.push(`        }`);
 
                         } else if (t === "datetime") {
                             const format = p.format || "time_date";
@@ -3019,6 +3180,8 @@ async function generateSnippetLocally() {
                             const dateFontId = addFont(fontFamily, 400, dateSize, italic);
 
                             lines.push(`        // widget:datetime id:${w.id} type:datetime x:${w.x} y:${w.y} w:${w.width} h:${w.height} format:${format} time_size:${timeSize} date_size:${dateSize} color:${colorProp} text_align:${align} italic:${italic} font_family:"${fontFamily}" ${getCondProps(w)}`);
+                            const condDT = getConditionCheck(w);
+                            if (condDT) lines.push(`        ${condDT}`);
                             lines.push(`        {`);
                             lines.push(`          auto now = id(ha_time).now();`);
 
@@ -3041,6 +3204,7 @@ async function generateSnippetLocally() {
                                 lines.push(`          it.strftime(${xPos}, ${w.y} + ${timeSize} + 2, id(${dateFontId}), ${color}, ${espAlign}, "%a, %b %d", now);`);
                             }
                             lines.push(`        }`);
+                            if (condDT) lines.push(`        }`);
                             if (colorProp.toLowerCase() === "gray" || colorProp.toLowerCase() === "grey") {
                                 if (isEpaper) {
                                     lines.push(`        apply_grey_dither_mask(${w.x}, ${w.y + RECT_Y_OFFSET}, ${w.width}, ${w.height});`);
@@ -3065,11 +3229,13 @@ async function generateSnippetLocally() {
                             }
 
                             lines.push(`        // widget:${t} id:${w.id} type:${t} x:${w.x} y:${w.y} w:${w.width} h:${w.height} path:"${path}" url:"${url}" invert:${invert} render_mode:"${renderMode}" ${getCondProps(w)}`);
-
+                            const condImg = getConditionCheck(w);
+                            if (condImg) lines.push(`        ${condImg}`);
                             if (imgId) {
                                 if (invert) lines.push(`        it.image(${w.x}, ${w.y}, id(${imgId}), color_off, color_on);`);
                                 else lines.push(`        it.image(${w.x}, ${w.y}, id(${imgId}));`);
                             }
+                            if (condImg) lines.push(`        }`);
 
                         } else if (t === "line") {
                             const strokeWidth = parseInt(p.stroke_width || 3, 10);
@@ -3078,8 +3244,11 @@ async function generateSnippetLocally() {
                             const orientation = p.orientation || "horizontal";
                             let rectW = (orientation === "vertical") ? strokeWidth : w.width;
                             let rectH = (orientation === "vertical") ? w.height : strokeWidth;
-                            lines.push(`        // widget:line id:${w.id} type:line x:${w.x} y:${w.y} w:${rectW} h:${rectH} stroke:${strokeWidth} color:${colorProp} orientation:${orientation}`);
+                            lines.push(`        // widget:line id:${w.id} type:line x:${w.x} y:${w.y} w:${rectW} h:${rectH} stroke:${strokeWidth} color:${colorProp} orientation:${orientation} ${getCondProps(w)}`);
+                            const condLine = getConditionCheck(w);
+                            if (condLine) lines.push(`        ${condLine}`);
                             lines.push(`        it.filled_rectangle(${w.x}, ${w.y}, ${rectW}, ${rectH}, ${color});`);
+                            if (condLine) lines.push(`        }`);
                         }
                     });
                 }

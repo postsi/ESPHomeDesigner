@@ -12,7 +12,8 @@
 - **Resolution & Shape Metadata**: Imported YAML files with `# Resolution: WxH` or `# Shape: round/rect` comments will now automatically resize and reshape the designer canvas to match the hardware.
 - **Premium Default Theme for Bars**: The `template_nav_bar` and `template_sensor_bar` widgets now default to a high-contrast white-on-black theme for better readability and a more premium aesthetic.
 - **New Hardware Support**: Added support for the **WaveShare Universal ESP32 epaper driver board** and **7.5" v2 display** via hardware recipes. Many thanks to **EmilyNerdGirl** for contributing this recipe!
- - **Hardware Recipe Documentation**: Expanded the [Hardware Recipes Guide](https://github.com/koosoli/ESPHomeDesigner/blob/main/hardware_recipes_guide.md) with comprehensive documentation for all supported metadata tags, including `# Orientation`, `# Dark Mode`, and `# Refresh Interval`.
+- **Hardware Recipe Documentation**: Expanded the [Hardware Recipes Guide](https://github.com/koosoli/ESPHomeDesigner/blob/main/hardware_recipes_guide.md) with comprehensive documentation for all supported metadata tags, including `# Orientation`, `# Dark Mode`, and `# Refresh Interval`.
+- **Full Conditional Visibility Support**: All widget types now support conditional rendering based on Home Assistant entity states (binary, numeric, text, and range). The designer automatically generates the required Home Assistant sensors and optimized C++ `if` blocks in the display lambda.
 
 ### 🐛 Bug Fixes
 - **Custom Resolution Import Fix**: Resolved a critical issue where custom resolutions from hardware recipes were ignored during import, resetting the canvas to 800x480.
@@ -26,6 +27,7 @@
 - **Local Sensor Hardware Support**: Fixed a bug where selecting "Local / On-Device Sensor" on DIY devices (like TRMNL DIY) failed to generate the required `sht4x` hardware platform, resulting in compilation failures. The designer now automatically includes the necessary hardware configuration if local widgets are used.
 - **Trmnl Device Fixes**: Fixed compilation errors for "Trmnl DIY" devices where local temperature/humidity sensors were incorrectly referenced. The system now safely handles cases where local sensors are requested but not supported by the hardware, and correctly sanitizes custom sensor IDs to prevent "Couldn't find ID" errors.
 - **Display Lambda Header Injection**: Fixed a critical bug where the `lambda: |-` header was incorrectly omitted if the string was found anywhere else in the file (e.g. in comments or other components). The generator now strictly checks for the header specifically preceding the lambda placeholder, ensuring valid YAML syntax for all display configurations.
+- **Widget Visibility Logic Fix**: Resolved a long-standing issue where conditional visibility rules were ignored during YAML export. The implementation now correctly generates re-import metadata (shorthand keys) and ensures sanitized sensor IDs are used throughout the C++ rendering logic.
 
 ---
 
