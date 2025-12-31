@@ -1,5 +1,41 @@
 # Release Notes
 
+
+## v0.8.5 - Round Displays & Hardware Expansion
+
+**Release Date:** December 29, 2025
+
+### 🚀 New Features
+- **Round Display Support**: Introduced support for round/circular display canvases, including correct coordinate mapping and visual boundaries in the designer.
+- **Improved Hardware Expansion**: Added dedicated support and tested hardware recipes for the **WaveShare Universal ESP32 e-Paper Driver Board** paired with the **7.5" v2 display**.
+- **Dynamic Orientation**: Updated import logic to respect `# Orientation: portrait/landscape` tags, automatically rotating the canvas to match the device's physical mounting.
+- **Resolution & Shape Metadata**: Imported YAML files with `# Resolution: WxH` or `# Shape: round/rect` comments will now automatically resize and reshape the designer canvas to match the hardware.
+- **Premium Default Theme for Bars**: The `template_nav_bar` and `template_sensor_bar` widgets now default to a high-contrast white-on-black theme for better readability and a more premium aesthetic.
+- **New Hardware Support**: Added support for the **WaveShare Universal ESP32 epaper driver board** and **7.5" v2 display** via hardware recipes. Many thanks to **EmilyNerdGirl** for contributing this recipe!
+- **Hardware Recipe Documentation**: Expanded the [Hardware Recipes Guide](https://github.com/koosoli/ESPHomeDesigner/blob/main/hardware_recipes_guide.md) with comprehensive documentation for all supported metadata tags, including `# Orientation`, `# Dark Mode`, and `# Refresh Interval`.
+- **Full Conditional Visibility Support**: All widget types now support conditional rendering based on Home Assistant entity states (binary, numeric, text, and range). The designer automatically generates the required Home Assistant sensors and optimized C++ `if` blocks in the display lambda.
+- **Improved Smart Condition Logic**: Enhanced sensor state detection for both binary and numeric sensors. The generator now recognizes expanded Home Assistant states like `open`, `locked`, `home`, and `active` as positive (true) values, and provides intelligent fallbacks for numeric sensors using common string labels.
+
+
+### 🐛 Bug Fixes
+- **Custom Resolution Import Fix**: Resolved a critical issue where custom resolutions from hardware recipes were ignored during import, resetting the canvas to 800x480.
+- **Inverted Color Metadata**: Added support for the `# Inverted: true/false` metadata tag in imported YAML files, ensuring correct color mapping from the first load.
+- **E-Paper Page Cycling Logic**: Refactored the `auto_cycle_timer` to use a robust delay-based loop and ensured the countdown resets on manual page interaction, resolving issues where cycling would stall or trigger unpredictably.
+- **Global Variable YAML Compliance**: Fixed ESPHome validation errors by wrapping numeric and boolean `initial_value` fields in quotes, ensuring compatibility with ESPHome 2024.11+.
+- **Playfair Display Glyph Fix**: Resolved an issue where the "Playfair Display" font caused ESPHome compilation errors (#105) due to a missing "µ" (micro) glyph. The designer now automatically filters out this character specifically for this font while preserving it for other font families.
+- **Line Object YAML Export Fix**: Fixed a critical issue where line objects generated invalid ESPHome YAML (#106). Points are now correctly formatted with `x` and `y` keys, and style properties (`line_opa`, `line_width`, etc.) are properly nested within a `style` block to comply with ESPHome LVGL requirements.
+- **LVGL Button & Opacity Fix**: Resolved ESPHome compilation errors (#104) by converting LVGL opacity values to percentages (e.g., `100%`) and correcting the `homeassistant.service` call structure for buttons (adding the missing `data:` block).
+- **Temperature & Humidity Sensor Fix**: Resolved issues (#102) where selecting a custom Home Assistant entity for on-device widgets caused "ID not found" errors. Standardized ID generation across all sensors to ensure hardware definitions and display lambdas always match.
+- **Local Sensor Hardware Support**: Fixed a bug where selecting "Local / On-Device Sensor" on DIY devices (like TRMNL DIY) failed to generate the required `sht4x` hardware platform, resulting in compilation failures. The designer now automatically includes the necessary hardware configuration if local widgets are used.
+- **Trmnl Device Fixes**: Fixed compilation errors for "Trmnl DIY" devices where local temperature/humidity sensors were incorrectly referenced. The system now safely handles cases where local sensors are requested but not supported by the hardware, and correctly sanitizes custom sensor IDs to prevent "Couldn't find ID" errors.
+- **Display Lambda Header Injection**: Fixed a critical bug where the `lambda: |-` header was incorrectly omitted if the string was found anywhere else in the file (e.g. in comments or other components). The generator now strictly checks for the header specifically preceding the lambda placeholder, ensuring valid YAML syntax for all display configurations.
+- **Widget Visibility Logic Fix**: Resolved a long-standing issue where conditional visibility rules were ignored during YAML export. The implementation now correctly generates re-import metadata (shorthand keys) and ensures sanitized sensor IDs are used throughout the C++ rendering logic.
+- **Waveshare 7" LCD Orientation Fix**: Implemented a dynamic package override mechanism to allow rotating the Waveshare 7" LCD (Landscape, Portrait, Inverted). Also added automatic touchscreen `transform` mapping to ensure touch inputs align with the rotated display.
+- **Quote Widget Regression Fix**: Resolved a regression where quotes failed to fetch and display on-device. Restored the missing `interval` and `http_request` fetch logic, updated to use robust `DynamicJsonDocument` parsing for reliability, and ensuring immediate visual feedback via a forced display update.
+- **Calendar Widget Fix**: Resolved a critical issue where calendar events were not displayed on-device. Replaced `json::parse_json` with robust manual `deserializeJson` parsing using a heap-allocated `DynamicJsonDocument` (2KB), and introduced a **"Compact Mode"** layout that aggressively reduces header and grid spacing to maximize event visibility on smaller widgets.
+
+---
+
 ## v0.8.4 - Weather Icon Sensor Fix
 
 **Release Date:** December 29, 2025
@@ -25,7 +61,9 @@
 - **M5 Touch Area Precision**: Fixed a bug in the coordinate transformation logic for M5 devices (specifically M5Paper) that caused touch inputs to be rotated 90° relative to the display. This ensures navigation buttons align correctly with visual elements. *Note: This fix remains untested on physical hardware.*
 - **Navigation Widget Height Persistence**: Fixed a critical bug where `template_nav_bar` and navigation touch buttons would reset their height to 10px on page refresh in the deployed Home Assistant version. The Python backend's `clamp_to_canvas()` function was using hardcoded 800x480 landscape dimensions, incorrectly clamping widget heights for portrait layouts or devices with non-standard resolutions (e.g., M5Paper 540x960).
 - **Gray Background Rendering**: Fixed an issue where `template_nav_bar` and `template_sensor_bar` widgets rendered their backgrounds as solid black instead of gray. The export logic was incorrectly using the foreground (icon) color for backgrounds and checking the wrong property for dithering.
-
+- **E-Paper Page Cycling Fix**: Fixed a regression in the `auto_cycle_timer` script generation where the missing `mode: restart` attribute prevented recursive execution, causing auto-cycling to stop after the first page change.
+- **Global Variable YAML Compliance**: Refactored the generation of numeric and boolean global variables (e.g., `display_page`, `page_refresh_default_s`) to remove redundant single quotes, improving compliance with strict YAML parsers and ensuring correct type inference in ESPHome.
+- **Hardware Profile & PSRAM Safety**: Improved analysis and documentation for hardware profiles. Identified that selecting mismatched profiles (e.g., reTerminal E1001 for generic ESP32-S3 boards) can cause boot loops due to incorrect PSRAM mode settings (`octal` vs `quad`). Added recommendations for the `update_interval: never` setting to prevent display update conflicts.
 ---
 
 ## v0.8.3 - Mobile Touch & Hardware Fixes

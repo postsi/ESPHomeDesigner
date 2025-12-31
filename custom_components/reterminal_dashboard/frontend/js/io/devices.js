@@ -139,7 +139,7 @@ window.DEVICE_PROFILES = {
       buttons: null
     },
     battery: {
-      attenuation: "11db",
+      attenuation: "12db",
       multiplier: 2.0,
       calibration: { min: 3.30, max: 4.15 }
     },
@@ -282,7 +282,7 @@ window.DEVICE_PROFILES = {
       main_power_pin: "GPIO2"
     },
     battery: {
-      attenuation: "11db",
+      attenuation: "12db",
       multiplier: 2.0,
       calibration: { min: 3.27, max: 4.15 } // Standard LiPo
     },
@@ -298,7 +298,7 @@ window.DEVICE_PROFILES = {
       // Since M5Paper with IT8951E is already swapped (swap_xy: true),
       // rotating 180 involves flipping the mirroring state.
       // If touch is still inverted after rotation, swap mirror_x/mirror_y below.
-      transform: { mirror_x: false, mirror_y: true, swap_xy: true },
+      transform: { mirror_x: true, mirror_y: true, swap_xy: true },
       // Calibration matches the IT8951E component's 960x540 coordinate space
       calibration: { x_min: 0, x_max: 960, y_min: 0, y_max: 540 }
     },

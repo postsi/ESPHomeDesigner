@@ -376,6 +376,16 @@ function parseSnippetYamlOffline(yamlText) {
         if (!line.startsWith("#")) continue;
 
         let m;
+        if (m = line.match(/TARGET DEVICE:\s*(.*)/i)) deviceSettings.target_device = m[1].trim();
+        if (m = line.match(/Name:\s*(.*)/i)) deviceSettings.name = m[1].trim();
+        if (m = line.match(/Resolution:\s*(\d+)x(\d+)/i)) {
+            deviceSettings.width = parseInt(m[1], 10);
+            deviceSettings.height = parseInt(m[2], 10);
+        }
+        if (m = line.match(/Shape:\s*(rect|round|circle)/i)) {
+            deviceSettings.shape = m[1].toLowerCase() === "rect" ? "rect" : "round";
+        }
+        if (m = line.match(/Inverted:\s*(true|false)/i)) deviceSettings.inverted_colors = (m[1].toLowerCase() === "true");
         if (m = line.match(/Orientation:\s*(landscape|portrait)/i)) deviceSettings.orientation = m[1].toLowerCase();
         if (m = line.match(/Dark Mode:\s*(enabled|disabled)/i)) deviceSettings.dark_mode = (m[1].toLowerCase() === "enabled");
         if (m = line.match(/Refresh Interval:\s*(\d+)/i)) deviceSettings.refresh_interval = parseInt(m[1], 10);
@@ -1358,7 +1368,8 @@ function loadLayoutIntoState(layout) {
         "orientation", "dark_mode", "sleep_enabled", "sleep_start_hour", "sleep_end_hour",
         "manual_refresh_only", "deep_sleep_enabled", "deep_sleep_interval",
         "daily_refresh_enabled", "daily_refresh_time", "no_refresh_start_hour", "no_refresh_end_hour",
-        "auto_cycle_enabled", "auto_cycle_interval_s", "refresh_interval"
+        "auto_cycle_enabled", "auto_cycle_interval_s", "refresh_interval",
+        "width", "height", "shape", "inverted_colors"
     ];
 
     settingKeys.forEach(key => {

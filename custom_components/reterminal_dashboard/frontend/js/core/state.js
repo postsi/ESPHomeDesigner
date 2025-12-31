@@ -122,27 +122,23 @@ class StateStore {
 
     getCanvasDimensions() {
         const model = this.state.deviceModel || this.state.settings.device_model || "reterminal_e1001";
-        // Safe access to device profile
         const profile = (window.DEVICE_PROFILES && window.DEVICE_PROFILES[model]) ? window.DEVICE_PROFILES[model] : null;
 
-        let width = 800; // Default width
-        let height = 480; // Default height
+        let width = this.state.settings.width || 800; // Default width
+        let height = this.state.settings.height || 480; // Default height
+        let customRes = !!(this.state.settings.width && this.state.settings.height);
 
-        if (profile) {
+        if (profile && !customRes) {
             if (profile.resolution) {
-                // Use explicit resolution if available
                 width = profile.resolution.width;
                 height = profile.resolution.height;
             } else if (profile.display_config) {
-                // Fallback: Try to find dimensions in the display_config
                 let foundWidth = null;
                 let foundHeight = null;
 
                 const parseDim = (line) => {
                     const parts = line.split(":");
-                    if (parts.length === 2) {
-                        return parseInt(parts[1].trim(), 10);
-                    }
+                    if (parts.length === 2) return parseInt(parts[1].trim(), 10);
                     return null;
                 };
 
@@ -157,23 +153,24 @@ class StateStore {
                 }
             }
 
-            // Specific fallbacks if parsing failed
-            if (width === 800 && height === 480) { // If still default
+            if (width === 800 && height === 480) {
                 if (model.includes("2432s028")) { width = 320; height = 240; }
                 else if (model.includes("4827s032r")) { width = 480; height = 272; }
             }
         }
 
-        // Apply orientation switch
         if (this.state.settings.orientation === ORIENTATIONS.PORTRAIT) {
             return { width: Math.min(width, height), height: Math.max(width, height) };
         } else {
-            // Landscape: ensure width > height usually, BUT some devices are natively portrait.
-            // However, the editor "Landscape" usually implies Width > Height.
-            // If the device is NATURALLY portrait (like phones), Landscape means rotated.
-            // So we should return the larger dim as width.
             return { width: Math.max(width, height), height: Math.min(width, height) };
         }
+    }
+
+    getCanvasShape() {
+        if (this.state.settings.shape) return this.state.settings.shape;
+        const model = this.state.deviceModel || this.state.settings.device_model || "reterminal_e1001";
+        const profile = (window.DEVICE_PROFILES && window.DEVICE_PROFILES[model]) ? window.DEVICE_PROFILES[model] : null;
+        return profile?.shape || "rect";
     }
 
     getPagesPayload() {

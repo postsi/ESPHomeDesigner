@@ -49,17 +49,10 @@ function generateTouchscreenSection(profile, displayId = "my_display", displayRo
 
     if (t.calibration) {
         lines.push("    calibration:");
-        // Swap x/y calibration values when display is rotated 90 or 270 degrees
+        // Calibration must reflect the raw hardware sensor range.
+        // The transform block (swap_xy, mirror_x, mirror_y) handles coordinate mapping.
         const cal = t.calibration;
-        if (displayRotation === 90 || displayRotation === 270) {
-            // Swap x and y calibration for 90/270 rotation
-            if (cal.x_min !== undefined) lines.push(`      x_min: ${cal.y_min}`);
-            if (cal.x_max !== undefined) lines.push(`      x_max: ${cal.y_max}`);
-            if (cal.y_min !== undefined) lines.push(`      y_min: ${cal.x_min}`);
-            if (cal.y_max !== undefined) lines.push(`      y_max: ${cal.x_max}`);
-        } else {
-            Object.entries(cal).forEach(([k, v]) => lines.push(`      ${k}: ${v}`));
-        }
+        Object.entries(cal).forEach(([k, v]) => lines.push(`      ${k}: ${v}`));
     }
 
     lines.push("");

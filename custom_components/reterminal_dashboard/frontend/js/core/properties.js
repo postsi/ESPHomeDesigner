@@ -894,14 +894,14 @@ class PropertiesPanel {
             this.addSectionLabel("Appearance");
             this.addCheckbox("Show Background", props.show_background !== false, (v) => updateProp("show_background", v));
             if (props.show_background !== false) {
-                this.addSelect("Background Color", props.background_color || "gray", colors, (v) => updateProp("background_color", v));
+                this.addSelect("Background Color", props.background_color || "black", colors, (v) => updateProp("background_color", v));
                 this.addLabeledInput("Border Radius", "number", props.border_radius || 8, (v) => updateProp("border_radius", parseInt(v, 10)));
             }
 
             this.addSectionLabel("Sizes & Color");
             this.addLabeledInput("Icon Size", "number", props.icon_size || 20, (v) => updateProp("icon_size", parseInt(v, 10)));
             this.addLabeledInput("Font Size", "number", props.font_size || 14, (v) => updateProp("font_size", parseInt(v, 10)));
-            this.addSelect("Foreground Color", props.color || "black", colors, (v) => updateProp("color", v));
+            this.addSelect("Foreground Color", props.color || "white", colors, (v) => updateProp("color", v));
         }
         else if (type === "template_nav_bar") {
             this.addSectionLabel("Button Visibility");
@@ -912,13 +912,13 @@ class PropertiesPanel {
             this.addSectionLabel("Appearance");
             this.addCheckbox("Show Background", props.show_background !== false, (v) => updateProp("show_background", v));
             if (props.show_background !== false) {
-                this.addSelect("Background Color", props.background_color || "gray", colors, (v) => updateProp("background_color", v));
+                this.addSelect("Background Color", props.background_color || "black", colors, (v) => updateProp("background_color", v));
                 this.addLabeledInput("Border Radius", "number", props.border_radius || 8, (v) => updateProp("border_radius", parseInt(v, 10)));
             }
 
             this.addSectionLabel("Sizes & Color");
             this.addLabeledInput("Icon Size", "number", props.icon_size || 24, (v) => updateProp("icon_size", parseInt(v, 10)));
-            this.addSelect("Foreground Color", props.color || "black", colors, (v) => updateProp("color", v));
+            this.addSelect("Foreground Color", props.color || "white", colors, (v) => updateProp("color", v));
         }
         else if (type === "touch_area") {
 
@@ -1855,7 +1855,13 @@ class PropertiesPanel {
             AppState.updateWidget(widget.id, { condition_operator: v });
         });
 
-        this.addLabeledInput("Condition State", "text", widget.condition_state, (v) => {
+        const commonStates = [
+            "on", "off", "open", "closed",
+            "true", "false", "home", "not_home",
+            "locked", "unlocked", "active", "inactive",
+            "detected", "clear", "occupied"
+        ];
+        this.addLabeledInputWithDataList("Condition State", "text", widget.condition_state, commonStates, (v) => {
             AppState.updateWidget(widget.id, { condition_state: v });
         });
 

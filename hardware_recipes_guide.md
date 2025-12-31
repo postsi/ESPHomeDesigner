@@ -33,8 +33,11 @@ The Designer looks for specific metadata in the form of comments at the top of y
 | `TARGET DEVICE` | The human-readable name (used by the **backend**). | `# TARGET DEVICE: My Custom ESP32-S3` |
 | `Name` | Alternative name keyword (used in **offline mode**). | `# Name: My Custom ESP32-S3` |
 | `Resolution` | The screen dimensions in `WxH` format. | `# Resolution: 800x480` |
-| `Shape` | The physical shape of the screen (`rect` or `round`). | `# Shape: rect` |
-| `Inverted` | If `true`, swaps black/white for e-paper displays with inverted color mapping. | `# Inverted: true` |
+| `Shape` | The physical shape of the screen (`rect`, `round`, or `circle`). | `# Shape: round` |
+| `Inverted` | If `true`, swaps black/white for e-paper displays. | `# Inverted: true` |
+| `Orientation` | Sets the default canvas orientation (`landscape` or `portrait`). | `# Orientation: portrait` |
+| `Dark Mode` | Sets the default theme (`enabled` or `disabled`). | `# Dark Mode: enabled` |
+| `Refresh Interval`| The default time between updates in seconds. | `# Refresh Interval: 600` |
 
 > [!TIP]
 > For maximum compatibility, include **both** `# TARGET DEVICE:` and `# Name:` with the same value.
@@ -46,7 +49,10 @@ The Designer looks for specific metadata in the form of comments at the top of y
 # Name: Waveshare Touch LCD 7"
 # Resolution: 800x480
 # Shape: rect
-# Inverted: true
+# Orientation: landscape
+# Inverted: false
+# Dark Mode: disabled
+# Refresh Interval: 300
 # ============================================================================
 ```
 

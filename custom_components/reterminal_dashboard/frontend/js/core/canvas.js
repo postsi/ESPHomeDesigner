@@ -88,10 +88,9 @@ class Canvas {
         this.canvas.style.height = `${dims.height}px`;
 
         // Apply device shape (e.g. round)
-        const currentModel = (typeof getDeviceModel === 'function') ? getDeviceModel() : "reterminal_e1001";
-        const profile = (window.DEVICE_PROFILES && window.DEVICE_PROFILES[currentModel]) ? window.DEVICE_PROFILES[currentModel] : null;
+        const shape = AppState.getCanvasShape();
 
-        if (profile && profile.shape === "round") {
+        if (shape === "round") {
             this.canvas.style.borderRadius = "50%";
             this.canvas.style.overflow = "hidden";
             this.canvas.style.boxShadow = "0 0 0 10px rgba(0,0,0,0.1)"; // Optional: hint at the bezel
