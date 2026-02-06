@@ -245,6 +245,12 @@ export default {
         const iconSize = parseInt(p.size || 24, 10);
         const fontSize = parseInt(p.font_size || 12, 10);
 
+        // Generate unique IDs for child labels that have dynamic properties
+        // ESPHome LVGL requires refreshing widgets that have direct lambdas, not their parents
+        const safeId = w.id.replace(/-/g, "_");
+        const iconLabelId = `${safeId}_icon`;
+        const textLabelId = `${safeId}_text`;
+
         let iconLambda = '!lambda |-\n';
         iconLambda += `          if (id(${sensorId}).has_state()) {\n`;
         iconLambda += `            float lvl = id(${sensorId}).state;\n`;
@@ -276,6 +282,7 @@ export default {
                 widgets: [
                     {
                         label: {
+                            id: iconLabelId,
                             width: iconSize + 10,
                             height: iconSize + 4,
                             align: "top_mid",
@@ -286,6 +293,7 @@ export default {
                     },
                     {
                         label: {
+                            id: textLabelId,
                             width: "100%",
                             height: fontSize + 4,
                             align: "bottom_mid",
@@ -334,10 +342,18 @@ export default {
             if (!eid) continue;
 
             if (isLvgl && pendingTriggers) {
+                // ESPHome LVGL (v1.0+) requires refreshing widgets that have direct dynamic (lambda) properties
+                // The battery_icon uses a wrapper obj with child labels that have the lambdas
+                // We must refresh the child labels, not the parent obj which has no lambdas
+                const safeWidgetId = w.id.replace(/-/g, "_");
+                const iconLabelId = `${safeWidgetId}_icon`;
+                const textLabelId = `${safeWidgetId}_text`;
+
                 if (!pendingTriggers.has(eid)) {
                     pendingTriggers.set(eid, new Set());
                 }
-                pendingTriggers.get(eid).add(`- lvgl.widget.refresh: ${w.id}`);
+                pendingTriggers.get(eid).add(`- lvgl.widget.refresh: ${iconLabelId}`);
+                pendingTriggers.get(eid).add(`- lvgl.widget.refresh: ${textLabelId}`);
             }
 
             // Explicitly export the Home Assistant sensor block if it's not a local sensor
