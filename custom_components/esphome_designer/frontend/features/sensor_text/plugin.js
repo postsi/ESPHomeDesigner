@@ -680,11 +680,12 @@ export default {
         let xVal = w.x;
         let yVal = w.y;
 
-        const isCentered = textAlign.includes("CENTER");
+        // Fix #259: Check RIGHT/LEFT first since "CENTER_RIGHT" contains both "CENTER" and "RIGHT"
         const isRight = textAlign.includes("RIGHT");
+        const isLeft = textAlign.includes("LEFT");
 
-        if (isCentered) xVal = Math.round(w.x + w.width / 2);
-        else if (isRight) xVal = Math.round(w.x + w.width);
+        if (isRight) xVal = Math.round(w.x + w.width);
+        else if (!isLeft) xVal = Math.round(w.x + w.width / 2); // CENTER (horizontal)
 
         if (textAlign.includes("BOTTOM")) yVal = Math.round(w.y + w.height);
         else if (!textAlign.includes("TOP")) yVal = Math.round(w.y + w.height / 2); // Middle
