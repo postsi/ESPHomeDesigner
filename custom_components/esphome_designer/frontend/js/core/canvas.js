@@ -52,6 +52,7 @@ export class Canvas {
                     this._lastFocusedIndex = e.index;
                 } else if (!isDragActive) {
                     this.focusPage(e.index);
+                    this._lastFocusedIndex = e.index;
                 }
                 // If drag is active, skip focus entirely - maintain current view
             }

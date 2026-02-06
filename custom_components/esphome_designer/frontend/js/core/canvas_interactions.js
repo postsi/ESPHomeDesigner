@@ -359,8 +359,8 @@ export function setupInteractions(canvasInstance) {
                 AppState.selectWidgets(prevSelection.includes(activeWidgetId) ? prevSelection : [activeWidgetId]);
             }
 
-            // Centralize focus on the new page
-            focusPage(canvasInstance, pageIndex, true);
+            // Centralize focus on the new page. Only fit zoom if we clicked the background (not a widget).
+            focusPage(canvasInstance, pageIndex, true, !activeWidgetId);
 
             // Re-query artboard after potential re-render
             const newArtboard = canvasInstance.canvas.querySelector(`.artboard[data-index="${pageIndex}"]`);
@@ -380,8 +380,8 @@ export function setupInteractions(canvasInstance) {
             ev.preventDefault();
             return;
         } else if (isBackgroundClick) {
-            // Re-center current page if background clicked
-            focusPage(canvasInstance, pageIndex, true);
+            // Re-center and fit current page if background clicked
+            focusPage(canvasInstance, pageIndex, true, true);
         }
 
         const rect = currentArtboardEl.getBoundingClientRect();
@@ -949,7 +949,9 @@ export function onMouseUp(ev, canvasInstance) {
 
                 if (moveCount > 0) {
                     Logger.log(`[Canvas] Successfully moved ${moveCount} widgets to page ${targetPageIndex}`);
-                    AppState.setCurrentPageIndex(targetPageIndex);
+                    AppState.setCurrentPageIndex(targetPageIndex, { suppressFocus: true });
+                    // Pan to the new page but DO NOT fit zoom (user is dropping a widget, keep current zoom)
+                    focusPage(canvasInstance, targetPageIndex, true, false);
                     render(canvasInstance);
                     return;
                 }

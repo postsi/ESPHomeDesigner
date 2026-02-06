@@ -390,7 +390,7 @@ export function calculateZoomToFit(canvasInstance, index = AppState.currentPageI
     // For small viewports, we don't want to zoom out too much
     // Reference: 480px is a typical small screen width
     const viewportSmallestDim = Math.min(viewportRect.width, viewportRect.height);
-    const minZoomFloor = Math.max(0.4, Math.min(1.0, viewportSmallestDim / 480));
+    const minZoomFloor = Math.max(0.7, Math.min(1.0, viewportSmallestDim / 600));
 
     // Clamp between the device-aware floor and 1.0
     return Math.max(minZoomFloor, Math.min(1.0, fitScale));
