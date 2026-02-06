@@ -1273,8 +1273,12 @@ export class PropertiesPanel {
             }, widget);
             this.endSection();
 
-            this.createSection("Appearance", true);
+            this.createSection("Forecast Settings", true);
+            this.addNumberWithSlider("Forecast Days", props.days || 5, 1, 7, (v) => updateProp("days", v));
             this.addSelect("Layout", props.layout || "horizontal", ["horizontal", "vertical"], (v) => updateProp("layout", v));
+            this.endSection();
+
+            this.createSection("Appearance", true);
             this.addCheckbox("Show High/Low Temp", props.show_high_low !== false, (v) => updateProp("show_high_low", v));
             this.addSelect("Temperature Unit", props.temp_unit || "C", ["C", "F"], (v) => updateProp("temp_unit", v));
             this.addLabeledInput("Day Font Size", "number", props.day_font_size || 14, (v) => updateProp("day_font_size", parseInt(v, 10)));

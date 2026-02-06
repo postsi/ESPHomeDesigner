@@ -243,15 +243,16 @@ const exportDoc = (w, context) => {
         lines.push(`          }`);
     }
 
+    const days = Math.min(7, Math.max(1, parseInt(p.days, 10) || 5));
     const isHorizontal = layout === "horizontal";
-    const xInc = isHorizontal ? Math.floor(w.width / 5) : 0;
-    const yInc = isHorizontal ? 0 : Math.floor(w.height / 5);
+    const xInc = isHorizontal ? Math.floor(w.width / days) : 0;
+    const yInc = isHorizontal ? 0 : Math.floor(w.height / days);
     const centerOffset = isHorizontal ? Math.floor(xInc / 2) : Math.floor(w.width / 2);
 
     const totalContentHeight = dayFontSize + 4 + iconSize + 4 + tempFontSize;
     const verticalStartOffset = Math.max(0, Math.floor((w.height - totalContentHeight) / 2));
 
-    for (let day = 0; day < 5; day++) {
+    for (let day = 0; day < days; day++) {
         const condSensorId = `weather_cond_day${day}`;
         const highSensorId = `weather_high_day${day}`;
         const lowSensorId = `weather_low_day${day}`;
@@ -292,8 +293,9 @@ const onExportNumericSensors = (context) => {
     if (weatherWidgets.length === 0) return;
 
     weatherWidgets.forEach(w => {
-        // Register triggers for all 15 sensors
-        for (let day = 0; day < 5; day++) {
+        // Register triggers for configured number of days
+        const days = Math.min(7, Math.max(1, parseInt(w.props?.days, 10) || 5));
+        for (let day = 0; day < days; day++) {
             const sensors = [
                 `sensor.weather_forecast_day_${day}_high`,
                 `sensor.weather_forecast_day_${day}_low`,
@@ -312,7 +314,7 @@ const onExportNumericSensors = (context) => {
         const tempUnit = w.props?.temp_unit || "C";
         const unitSymbol = tempUnit === "F" ? "°F" : "°C";
 
-        for (let day = 0; day < 5; day++) {
+        for (let day = 0; day < days; day++) {
             const highSid = `sensor.weather_forecast_day_${day}_high`;
             const lowSid = `sensor.weather_forecast_day_${day}_low`;
             const highId = `weather_high_day${day}`;
@@ -348,7 +350,8 @@ const onExportTextSensors = (context) => {
     const weatherEntity = targets[0].entity_id || p.weather_entity || "weather.forecast_home";
 
     let addedAny = false;
-    for (let day = 0; day < 5; day++) {
+    const days = Math.min(7, Math.max(1, parseInt(p.days, 10) || 5));
+    for (let day = 0; day < days; day++) {
         const condId = `weather_cond_day${day}`;
         if (context.seenSensorIds && context.seenSensorIds.has(condId)) continue;
 
@@ -388,7 +391,7 @@ const onExportTextSensors = (context) => {
     lines.push("#     sensor:");
     const tempUnit = p.temp_unit || "C";
     const unitSymbol = tempUnit === "F" ? "°F" : "°C";
-    for (let day = 0; day < 5; day++) {
+    for (let day = 0; day < days; day++) {
         lines.push(`#       - name: 'Weather Forecast Day ${day} High'`);
         lines.push(`#         unique_id: weather_forecast_day_${day}_high`);
         lines.push(`#         unit_of_measurement: '${unitSymbol}'`);
@@ -451,7 +454,7 @@ export default {
     render,
     exportLVGL: (w, { common, convertColor, getLVGLFont }) => {
         const p = w.props || {};
-        const days = 5;
+        const days = Math.min(7, Math.max(1, parseInt(p.days, 10) || 5));
         const isHorizontal = (p.layout || "horizontal") === "horizontal";
         const color = convertColor(p.color || "theme_auto");
         const dayFS = parseInt(p.day_font_size || 12, 10);
