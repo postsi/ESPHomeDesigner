@@ -222,7 +222,7 @@ function parseHardwareRecipeClientSide(yaml, filename) {
 
     return {
         id: id,
-        name: name + " (Local)",
+        name: name, // Label will be added by frontend based on isOfflineImport flag
         resolution: { width, height },
         shape: shape,
         displayPlatform: displayPlatform,

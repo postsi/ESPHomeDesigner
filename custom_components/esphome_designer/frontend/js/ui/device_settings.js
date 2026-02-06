@@ -729,29 +729,78 @@ export class DeviceSettings {
 
     populateDeviceSelect() {
         if (this.modelInput && DEVICE_PROFILES) {
-            // Wait for backend to load? DEVICE_PROFILES is now static + dynamic
-            // But we should verify it has content.
-            // Logger.log("[DeviceSettings] Populating dropdown");
-
             const currentVal = this.modelInput.value;
             Logger.log("[DeviceSettings] Populating dropdown with", Object.keys(DEVICE_PROFILES).length, "profiles");
 
             this.modelInput.innerHTML = ""; // Clear existing
 
-            // Add standard profiles
             const supportedIds = SUPPORTED_DEVICE_IDS || [];
+
+            // Separate profiles into groups for better organization
+            const builtInProfiles = [];
+            const localProfiles = [];
+
             Object.entries(DEVICE_PROFILES).forEach(([key, profile]) => {
-                Logger.log(`  - Adding: ${key} (${profile.name})`);
+                // Determine if this is a local/custom profile
+                const isLocal = profile.isCustomProfile || profile.isOfflineImport ||
+                    (profile.isPackageBased && !supportedIds.includes(key));
+
+                if (isLocal) {
+                    localProfiles.push([key, profile]);
+                } else {
+                    builtInProfiles.push([key, profile]);
+                }
+            });
+
+            // Helper to create option element with proper labeling
+            const createOption = (key, profile) => {
                 const opt = document.createElement("option");
                 opt.value = key;
 
-                let displayName = profile.name;
-                if (!supportedIds.includes(key)) {
-                    displayName += " (untested)";
-                }
-                opt.textContent = displayName;
+                let displayName = profile.name || key;
 
-                this.modelInput.appendChild(opt);
+                // Remove existing suffixes to avoid duplication
+                displayName = displayName.replace(/\s*\(Local\)\s*/gi, '').replace(/\s*\(untested\)\s*/gi, '').trim();
+
+                // Build suffix based on profile properties
+                const suffixes = [];
+
+                // Mark local/custom profiles
+                if (profile.isCustomProfile || profile.isOfflineImport) {
+                    suffixes.push("Local");
+                }
+
+                // Mark untested profiles (not in SUPPORTED_DEVICE_IDS)
+                if (!supportedIds.includes(key)) {
+                    suffixes.push("untested");
+                }
+
+                if (suffixes.length > 0) {
+                    displayName += ` (${suffixes.join(", ")})`;
+                }
+
+                opt.textContent = displayName;
+                return opt;
+            };
+
+            // Add built-in profiles first
+            builtInProfiles.forEach(([key, profile]) => {
+                this.modelInput.appendChild(createOption(key, profile));
+            });
+
+            // Add separator if we have local profiles
+            if (localProfiles.length > 0 && builtInProfiles.length > 0) {
+                const separator = document.createElement("option");
+                separator.disabled = true;
+                separator.textContent = "── Local Profiles ──";
+                separator.style.fontWeight = "bold";
+                separator.style.color = "var(--text-dim)";
+                this.modelInput.appendChild(separator);
+            }
+
+            // Add local profiles
+            localProfiles.forEach(([key, profile]) => {
+                this.modelInput.appendChild(createOption(key, profile));
             });
 
             // Add Custom Profile option at the end
