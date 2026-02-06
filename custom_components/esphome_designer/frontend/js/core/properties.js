@@ -1071,11 +1071,17 @@ export class PropertiesPanel {
 
             this.createSection("Appearance", true);
             this.addCheckbox("Auto-scale Y Axis", props.auto_scale !== false, (v) => updateProp("auto_scale", v));
-            if (!(props.auto_scale !== false)) {
+            if (props.auto_scale !== false) {
+                // Auto-scale is ON: show Min Range option
+                this.addLabeledInput("Min Range", "number", props.min_range || "10", (v) => updateProp("min_range", v));
+                this.addHint("Ensures at least this many units are visible on Y-axis (prevents flat lines from filling the graph).");
+            } else {
+                // Auto-scale is OFF: show fixed bounds
                 this.addCompactPropertyRow(() => {
                     this.addLabeledInput("Min Value", "number", props.min_value || "0", (v) => updateProp("min_value", v));
                     this.addLabeledInput("Max Value", "number", props.max_value || "100", (v) => updateProp("max_value", v));
                 });
+                this.addHint("Fixed Y-axis bounds.");
             }
             this.addColorSelector("Line Color", props.color || "black", colors, (v) => updateProp("color", v));
             this.addSelect("Line Type", props.line_type || "SOLID", ["SOLID", "DASHED", "DOTTED"], (v) => updateProp("line_type", v));

@@ -390,16 +390,21 @@ const exportDoc = (w, context) => {
             lines.push(`        it.printf(${w.x}+4, ${w.y}+2, id(${fontId}), ${color}, TextAlign::TOP_LEFT, "${title}");`);
         }
 
-        const minY = parseFloat(minValue) || 0;
-        const maxY = parseFloat(maxValue) || 100;
-        const yRange = maxY - minY;
-        const ySteps = 4;
-        for (let i = 0; i <= ySteps; i++) {
-            const ratio = i / ySteps;
-            const val = minY + (yRange * ratio);
-            const yOffset = Math.round(w.height * (1 - ratio));
-            const fmt = yRange >= 10 ? "%.0f" : "%.1f";
-            lines.push(`        it.printf(${w.x} - 4, ${w.y} + ${yOffset} - 6, id(${fontId}), ${color}, TextAlign::TOP_RIGHT, "${fmt}", (float)${val});`);
+        // Only draw Y-axis labels when auto-scale is OFF (explicit min/max values set)
+        // When auto-scale is ON, labels would be misleading since ESPHome scales dynamically
+        const hasExplicitBounds = minValue !== "" && maxValue !== "";
+        if (hasExplicitBounds) {
+            const minY = parseFloat(minValue) || 0;
+            const maxY = parseFloat(maxValue) || 100;
+            const yRange = maxY - minY;
+            const ySteps = 4;
+            for (let i = 0; i <= ySteps; i++) {
+                const ratio = i / ySteps;
+                const val = minY + (yRange * ratio);
+                const yOffset = Math.round(w.height * (1 - ratio));
+                const fmt = yRange >= 10 ? "%.0f" : "%.1f";
+                lines.push(`        it.printf(${w.x} - 4, ${w.y} + ${yOffset} - 6, id(${fontId}), ${color}, TextAlign::TOP_RIGHT, "${fmt}", (float)${val});`);
+            }
         }
 
         let durationSec = 3600;
@@ -503,10 +508,20 @@ const onExportComponents = (context) => {
             if (lineType !== "SOLID") lines.push(`        line_type: ${lineType}`);
             if (continuous) lines.push(`        continuous: true`);
 
-            if (p.min_value !== undefined && p.min_value !== null && String(p.min_value).trim() !== "") lines.push(`    min_value: ${p.min_value}`);
-            if (p.max_value !== undefined && p.max_value !== null && String(p.max_value).trim() !== "") lines.push(`    max_value: ${p.max_value}`);
-            if (maxRange !== null) lines.push(`    max_range: ${maxRange}`);
-            if (minRange !== null) lines.push(`    min_range: ${minRange}`);
+            const hasMinValue = p.min_value !== undefined && p.min_value !== null && String(p.min_value).trim() !== "";
+            const hasMaxValue = p.max_value !== undefined && p.max_value !== null && String(p.max_value).trim() !== "";
+            const hasMinRange = minRange !== null;
+            const hasMaxRange = maxRange !== null;
+
+            if (hasMinValue) lines.push(`    min_value: ${p.min_value}`);
+            if (hasMaxValue) lines.push(`    max_value: ${p.max_value}`);
+            if (hasMaxRange) lines.push(`    max_range: ${maxRange}`);
+            if (hasMinRange) lines.push(`    min_range: ${minRange}`);
+
+            // Auto-scale fallback: if no bounds are set, use min_range to enable ESPHome's auto-scaling
+            if (!hasMinValue && !hasMaxValue && !hasMinRange && !hasMaxRange) {
+                lines.push(`    min_range: 10`);
+            }
         });
         lines.push("");
     }
