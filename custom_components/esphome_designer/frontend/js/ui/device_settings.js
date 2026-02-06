@@ -65,6 +65,7 @@ export class DeviceSettings {
 
         this.customChip = document.getElementById('customChip');
         this.customTech = document.getElementById('customTech');
+        this.customResPreset = document.getElementById('customResPreset');
         this.customRes = document.getElementById('customRes');
         this.customShape = document.getElementById('customShape');
         this.customPsram = document.getElementById('customPsram');
@@ -214,8 +215,37 @@ export class DeviceSettings {
                     const squareSize = Math.min(w, h);
                     this.customRes.value = `${squareSize}x${squareSize}`;
                     Logger.log(`[DeviceSettings] Auto-set square resolution for round display: ${squareSize}x${squareSize}`);
+
+                    // Update preset to custom if it no longer matches
+                    if (this.customResPreset) {
+                        this.customResPreset.value = 'custom';
+                    }
+
                     // Trigger save
                     this.customRes.dispatchEvent(new Event('change'));
+                }
+            });
+        }
+
+        // Custom Resolution Preset listener
+        if (this.customResPreset && this.customRes) {
+            this.customResPreset.addEventListener('change', () => {
+                const val = this.customResPreset.value;
+                if (val !== 'custom') {
+                    this.customRes.value = val;
+                    Logger.log(`[DeviceSettings] Applied resolution preset: ${val}`);
+                    this.customRes.dispatchEvent(new Event('change'));
+                }
+            });
+
+            // Update preset to 'custom' if the manual resolution is edited
+            this.customRes.addEventListener('input', () => {
+                const currentVal = this.customRes.value;
+                const matchesPreset = Array.from(this.customResPreset.options).some(opt => opt.value === currentVal);
+                if (!matchesPreset) {
+                    this.customResPreset.value = 'custom';
+                } else {
+                    this.customResPreset.value = currentVal;
                 }
             });
         }
@@ -280,7 +310,7 @@ export class DeviceSettings {
 
     setupCustomHardwareAutoSave() {
         const customInputs = [
-            this.customChip, this.customTech, this.customRes, this.customShape,
+            this.customChip, this.customTech, this.customResPreset, this.customRes, this.customShape,
             this.customPsram, this.customDisplayDriver, this.customDisplayModel, this.customTouchTech,
             'pin_cs', 'pin_dc', 'pin_rst', 'pin_busy', 'pin_clk', 'pin_mosi',
             'pin_backlight', 'pin_sda', 'pin_scl', 'pin_touch_int', 'pin_touch_rst'
@@ -673,7 +703,20 @@ export class DeviceSettings {
 
         if (this.customChip) this.customChip.value = ch.chip || "esp32-s3";
         if (this.customTech) this.customTech.value = ch.tech || "lcd";
-        if (this.customRes) this.customRes.value = `${ch.resWidth || 800}x${ch.resHeight || 480}`;
+        if (this.customRes) {
+            const resVal = `${ch.resWidth || 800}x${ch.resHeight || 480}`;
+            this.customRes.value = resVal;
+
+            if (this.customResPreset) {
+                // Try to match the loaded resolution to a preset
+                const options = Array.from(this.customResPreset.options).map(o => o.value);
+                if (options.includes(resVal)) {
+                    this.customResPreset.value = resVal;
+                } else {
+                    this.customResPreset.value = 'custom';
+                }
+            }
+        }
         if (this.customShape) this.customShape.value = ch.shape || "rect";
         if (this.customPsram) this.customPsram.checked = !!ch.psram;
 

@@ -520,8 +520,32 @@
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                   <div class="field">
-                    <div class="prop-label" style="font-size:10px;">Resolution</div>
-                    <input id="customRes" class="prop-input-sm" type="text" placeholder="800x480" value="800x480" />
+                    <div class="prop-label" style="font-size:10px;">Resolution Preset</div>
+                    <select id="customResPreset" class="prop-input-sm">
+                      <option value="custom">Manual...</option>
+                      <!-- LCD / OLED -->
+                      <optgroup label="LCD / OLED">
+                        <option value="128x64">128x64 (0.96")</option>
+                        <option value="128x128">128x128 (1.44")</option>
+                        <option value="240x240">240x240 (1.3/1.54")</option>
+                        <option value="320x240">320x240 (2.4/2.8")</option>
+                        <option value="320x480">320x480 (3.5")</option>
+                        <option value="480x320">480x320 (3.5" alt)</option>
+                        <option value="480x480">480x480 (Round/Square)</option>
+                        <option value="800x480">800x480 (4-7")</option>
+                        <option value="1024x600">1024x600 (7-10")</option>
+                      </optgroup>
+                      <!-- E-Paper -->
+                      <optgroup label="E-Paper">
+                        <option value="250x122">2.13" (250x122)</option>
+                        <option value="296x128">2.9" (296x128)</option>
+                        <option value="400x300">4.2" (400x300)</option>
+                        <option value="600x448">5.65" (600x448 7-Color)</option>
+                        <option value="640x384">5.83" (640x384)</option>
+                        <option value="800x480">7.5" (800x480)</option>
+                        <option value="880x528">7.5" HD (880x528)</option>
+                      </optgroup>
+                    </select>
                   </div>
                   <div class="field">
                     <div class="prop-label" style="font-size:10px;">Shape</div>
@@ -530,6 +554,10 @@
                       <option value="round">Round</option>
                     </select>
                   </div>
+                </div>
+                <div class="field">
+                  <div class="prop-label" style="font-size:10px;">Manual Resolution</div>
+                  <input id="customRes" class="prop-input-sm" type="text" placeholder="800x480" value="800x480" />
                 </div>
                 <div style="display:flex; gap:16px; margin-top:8px;">
                   <label style="display:flex; align-items:center; gap:6px; font-size:10px; cursor:pointer;">
