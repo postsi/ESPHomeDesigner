@@ -883,12 +883,15 @@ export function onMouseUp(ev, canvasInstance) {
             } else if (targetPlaceholder) {
                 // DROP ONTO "+ ADD PAGE" PLACEHOLDER
                 // Create the page at the end of the list, but DON'T switch to it yet
+                // IMPORTANT: Suppress focus to prevent view recentering during widget drag
+                canvasInstance.suppressNextFocus = true;
                 const pageCount = AppState.pages.length;
                 const newPage = AppState.addPage(pageCount);
                 if (newPage) {
                     targetPageIndex = pageCount;
                     Logger.log(`[Canvas] Created new page ${targetPageIndex} at index ${targetPageIndex}. Source was ${sourcePageIndex}`);
                 }
+
             } else {
                 // 2. Check if dropped onto a page list item in the sidebar
                 const pageListItem = targetEl?.closest("#pageList .item");
@@ -957,8 +960,8 @@ export function onMouseUp(ev, canvasInstance) {
                 if (moveCount > 0) {
                     Logger.log(`[Canvas] Successfully moved ${moveCount} widgets to page ${targetPageIndex}`);
                     AppState.setCurrentPageIndex(targetPageIndex, { suppressFocus: true });
-                    // Pan to the new page but DO NOT fit zoom (user is dropping a widget, keep current zoom)
-                    focusPage(canvasInstance, targetPageIndex, true, false);
+                    // Do NOT recenter the view when moving widgets to another page.
+                    // The user explicitly wants to keep their current viewport position.
                     render(canvasInstance);
                     return;
                 }
