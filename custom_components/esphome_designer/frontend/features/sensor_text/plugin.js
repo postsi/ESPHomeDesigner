@@ -276,16 +276,35 @@ export default {
         }
 
         let unit = (p.unit || "").trim();
-        // Auto-detect unit (simplified check)
+
+        // Auto-detect unit if missing and not suppressed (same logic as direct export)
+        if (!unit && !p.hide_unit && !format.endsWith("_no_unit") && window.AppState && window.AppState.entityStates) {
+            const eObj = window.AppState.entityStates[entityId];
+            if (eObj) {
+                if (eObj.attributes && eObj.attributes.unit_of_measurement) {
+                    unit = eObj.attributes.unit_of_measurement;
+                } else if (eObj.formatted) {
+                    const match = eObj.formatted.match(/^([-+]?\d*[.,]?\d+)\s*(.*)$/);
+                    if (match && match[2]) unit = match[2].trim();
+                }
+            }
+        }
+
+        // Fallback: Heuristic unit detection from entity ID if still no unit
         if (!unit && !p.hide_unit && !format.endsWith("_no_unit") && entityId) {
             const eid = entityId.toLowerCase();
-            // Simple fallback heuristics if app state not available during static export
-            if (eid.includes("temp")) unit = "°C";
-            else if (eid.includes("humid")) unit = "%";
-            else if (eid.includes("batt")) unit = "%";
-            else if (eid.includes("volt")) unit = "V";
-            else if (eid.includes("power")) unit = "W";
+            if (eid.includes("_power") || eid.includes("_watt")) unit = "W";
+            else if (eid.includes("_energy") || eid.includes("_kwh")) unit = "kWh";
+            else if (eid.includes("_temperature") || eid.includes("_temp")) unit = "°C";
+            else if (eid.includes("_humidity") || eid.includes("humid")) unit = "%";
+            else if (eid.includes("_voltage") || eid.includes("_volt") || eid.includes("volt")) unit = "V";
+            else if (eid.includes("_current") || eid.includes("_amp")) unit = "A";
+            else if (eid.includes("_battery") || eid.includes("batt")) unit = "%";
+            else if (eid.includes("_pressure") || eid.includes("_hpa")) unit = "hPa";
+            else if (eid.includes("_speed") || eid.includes("_kmh")) unit = "km/h";
+            else if (eid.includes("_percent") || eid.includes("_pct")) unit = "%";
         }
+
 
         // Helper to formatting strings
         const escapeFmt = (str) => (str || "").replace(/"/g, '\\"').replace(/%/g, "%%");
@@ -377,7 +396,7 @@ export default {
             label: {
                 ...common,
                 text: textLambda,
-                text_font: getLVGLFont(p.font_family, p.font_size || p.value_font_size, p.font_weight, p.italic),
+                text_font: getLVGLFont(p.font_family, format === "label_only" ? p.label_font_size : p.value_font_size, p.font_weight, p.italic),
                 text_color: convertColor(p.color),
                 text_align: textAlign,
                 bg_color: p.bg_color === "transparent" ? undefined : convertColor(p.bg_color),
