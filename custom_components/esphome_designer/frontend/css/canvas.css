@@ -165,11 +165,21 @@
     transform: scale(1.02);
 }
 
+.artboard-header-container {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    overflow: hidden;
+    /* Clip to container width */
+}
+
 .artboard-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 6px 12px;
+    height: 40px;
+    /* Predictable height for scaling math */
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(12px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -180,6 +190,11 @@
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     cursor: grab;
     /* Indicates page can be moved */
+    overflow: visible;
+    /* Let scaling handle size, not clipping */
+    white-space: nowrap;
+    flex-shrink: 0;
+    /* Prevent flex compression */
 }
 
 .artboard-header:active {
@@ -201,11 +216,16 @@
 .artboard-name {
     text-transform: uppercase;
     letter-spacing: 0.12em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .artboard-actions {
     display: flex;
     gap: 6px;
+    flex-shrink: 0;
+    /* Never compress the action buttons */
 }
 
 .artboard-btn {

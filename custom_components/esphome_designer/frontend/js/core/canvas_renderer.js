@@ -34,6 +34,9 @@ export function render(canvasInstance) {
 
     // Render each page as an artboard
     pages.forEach((page, index) => {
+        const displayWidth = dims.width;
+        const displayHeight = dims.height;
+
         const artboardWrapper = document.createElement("div");
         artboardWrapper.className = "artboard-wrapper";
         artboardWrapper.dataset.index = index;
@@ -103,7 +106,27 @@ export function render(canvasInstance) {
         }));
 
         header.appendChild(actions);
-        artboardWrapper.appendChild(header);
+
+        // Atomic Scaling: Wrap header in a container to maintain layout while scaling content
+        const headerContainer = document.createElement("div");
+        headerContainer.className = "artboard-header-container";
+        headerContainer.style.width = displayWidth + "px";
+        headerContainer.appendChild(header);
+
+        const refWidth = 320; // Natural width required for all tools + name
+        if (displayWidth < refWidth) {
+            const scale = displayWidth / refWidth;
+            header.style.width = refWidth + "px";
+            header.style.transform = `scale(${scale})`;
+            header.style.transformOrigin = "top left";
+            headerContainer.style.height = (40 * scale) + "px"; // 40px is the header height in CSS
+        } else {
+            header.style.width = "100%";
+            header.style.transform = "none";
+            headerContainer.style.height = "auto";
+        }
+
+        artboardWrapper.appendChild(headerContainer);
 
         // 2. Render Artboard Content
         const shape = AppState.getCanvasShape();
@@ -115,9 +138,6 @@ export function render(canvasInstance) {
 
         // For round displays, use actual resolution - this allows ellipses for non-square resolutions
         // The device settings auto-set square resolution when 'round' is selected, but users can override
-        const displayWidth = dims.width;
-        const displayHeight = dims.height;
-
         artboard.style.width = `${displayWidth}px`;
         artboard.style.height = `${displayHeight}px`;
 
