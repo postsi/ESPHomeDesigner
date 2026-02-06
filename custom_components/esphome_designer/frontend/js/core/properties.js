@@ -1482,7 +1482,7 @@ export class PropertiesPanel {
         }
         else if (type === "image") {
             this.createSection("Content", true);
-            this.addHint("🖼️ Static image from ESPHome:<br/><code style='background:#f0f0f0;padding:2px 4px;border-radius:2px;'>/config/esphome/images/logo.png</code><br/><span style='color:#4a9eff;'>ℹ️ Place images in /config/esphome/images/ folder</span>");
+            this.addHint("🖼️ Static image from ESPHome.<br/><span style='color:#888;font-size:11px;'>Replace the default path with your actual image file path.</span>");
             this.addLabeledInput("Image Path", "text", props.path || "", (v) => updateProp("path", v));
             this.endSection();
 
