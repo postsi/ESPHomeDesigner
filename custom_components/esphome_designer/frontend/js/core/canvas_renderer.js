@@ -388,12 +388,15 @@ export function calculateZoomToFit(canvasInstance, index = AppState.currentPageI
 
     // Calculate a device-aware minimum zoom floor
     // For small viewports, we don't want to zoom out too much
-    // Reference: 480px is a typical small screen width
     const viewportSmallestDim = Math.min(viewportRect.width, viewportRect.height);
     const minZoomFloor = Math.max(0.7, Math.min(1.0, viewportSmallestDim / 600));
 
-    // Clamp between the device-aware floor and 1.0
-    return Math.max(minZoomFloor, Math.min(1.0, fitScale));
+    // Smart Magnification: for very small devices (e.g. 100x100), allow zooming in up to 4x 
+    // to ensure the artboard is actually usable in the preview.
+    const maxZoomCeiling = 4.0;
+
+    // Clamp between the device-aware floor and the magnification ceiling
+    return Math.max(minZoomFloor, Math.min(maxZoomCeiling, fitScale));
 }
 
 export function updateWidgetDOM(canvasInstance, widget, skipPluginRender = false) {
