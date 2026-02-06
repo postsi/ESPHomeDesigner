@@ -389,14 +389,14 @@ export async function renderWidgetPalette(containerId) {
                     isCompatible = hasExport && !isExcludedCategory && !isExcludedWidget;
                     explanation = `Not supported in ${currentMode === 'oepl' ? 'OpenEpaperLink' : 'OpenDisplay'} mode`;
                 } else if (currentMode === 'lvgl') {
-                    // CRITICAL ARCHITECTURAL NOTE: LVGL mode is strictly restricted to native LVGL objects 
-                    // and essential input/navigation controls to prevent mixing incompatible
-                    // lambda-based rendering with the LVGL stack.
+                    // LVGL mode: Permit native LVGL objects, translatable widgets (with exportLVGL),
+                    // and essential input/navigation controls.
                     const isLvglNative = widget.type.startsWith('lvgl_');
                     const isInputCategory = (category.id === 'inputs');
+                    const hasLVGLExport = typeof plugin?.exportLVGL === 'function';
 
-                    isCompatible = isLvglNative || isInputCategory;
-                    explanation = 'Only native LVGL widgets and input controls supported in LVGL mode';
+                    isCompatible = isLvglNative || isInputCategory || hasLVGLExport;
+                    explanation = 'Widget not compatible with LVGL mode';
                 } else if (currentMode === 'direct') {
                     // Direct mode is display.lambda.
                     // Compatible if it has 'export' method AND is not strictly for another protocol (LVGL/OEPL).

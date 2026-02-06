@@ -791,8 +791,10 @@ class AppStateFacade {
         if (mode === 'oepl') return !!plugin.exportOEPL;
         if (mode === 'opendisplay') return !!plugin.exportOpenDisplay;
         if (mode === 'lvgl') {
-            // Strict Isolation: Only permit native LVGL widgets
-            return w.type && w.type.startsWith('lvgl_');
+            // LVGL mode: permit native LVGL widgets OR widgets with exportLVGL translation
+            const isNativeLVGL = w.type && w.type.startsWith('lvgl_');
+            const hasLVGLExport = typeof plugin.exportLVGL === 'function';
+            return isNativeLVGL || hasLVGLExport;
         }
         if (mode === 'direct') {
             // Direct mode uses display.lambda. Compatible if it has 'export' method
