@@ -24,6 +24,9 @@ export class Canvas {
         // Fixes race condition where auto-refresh destroys drop target
         this.isExternalDragging = false;
 
+        // Focus suppression flag - set by Add Page to prevent jarring zoom
+        this.suppressNextFocus = false;
+
         // Helper bindings for listeners that need removal reference
         // (Though interactions module manages them via direct reference or stored props)
         this._boundMouseMove = (ev) => onMouseMove(ev, this);
@@ -39,6 +42,14 @@ export class Canvas {
         on(EVENTS.STATE_CHANGED, () => this.render());
         on(EVENTS.PAGE_CHANGED, (e) => {
             this.render();
+
+            // Check canvas-level suppression flag (set by Add Page placeholder)
+            if (this.suppressNextFocus) {
+                this.suppressNextFocus = false;
+                this._lastFocusedIndex = e.index; // Sync index to avoid future triggers
+                return;
+            }
+
             // Focus the new page after render, unless suppressed
             if (!e.suppressFocus) {
                 // GUARD: Skip auto-zoom during active drag operations

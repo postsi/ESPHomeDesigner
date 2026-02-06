@@ -1410,6 +1410,9 @@ export function setupDragAndDrop(canvasInstance) {
             widget.x = Math.max(0, Math.min(dims.width - widget.width, widget.x));
             widget.y = Math.max(0, Math.min(dims.height - widget.height, widget.y));
 
+            // Set suppression flag to prevent auto-pan/zoom
+            canvasInstance.suppressNextFocus = true;
+
             // ALWAYS add the widget
             AppState.addWidget(widget, targetPageIndex);
 

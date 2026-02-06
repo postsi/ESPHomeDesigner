@@ -310,6 +310,12 @@ export class Sidebar {
 
             AppState.addWidget(widget);
             Logger.log("Sidebar: Widget added to state");
+
+            // Suppress focus skip when adding via click too
+            if (window.app && window.app.canvas) {
+                window.app.canvas.suppressNextFocus = true;
+            }
+
             if (debugDiv) debugDiv.innerHTML += 'Widget added to state<br>';
         } catch (err) {
             Logger.error("Sidebar: Error creating/adding widget", err);

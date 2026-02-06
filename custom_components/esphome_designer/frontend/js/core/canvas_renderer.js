@@ -250,16 +250,21 @@ export function render(canvasInstance) {
         addPlaceholder.classList.add("round-display");
     }
 
-    // Click handler
     const handleClick = (e) => {
         Logger.log("[Canvas] Add Page placeholder clicked");
         e.stopPropagation();
         e.preventDefault(); // Prevent accidental selection logic
+
         const newPage = AppState.addPage();
         if (newPage) {
             const newIndex = AppState.pages.length - 1;
+
+            // Set suppression flag on canvas BEFORE triggering page change
+            if (window.app && window.app.canvas) {
+                window.app.canvas.suppressNextFocus = true;
+            }
+
             AppState.setCurrentPageIndex(newIndex);
-            emit(EVENTS.STATE_CHANGED);
         }
     };
 
@@ -413,9 +418,9 @@ export function calculateZoomToFit(canvasInstance, index = AppState.currentPageI
     const fitScale = Math.min(scaleX, scaleY);
 
     // Calculate a device-aware minimum zoom floor
-    // For small viewports, we don't want to zoom out too much
+    // For small viewports, we allow zooming out much further to ensure full visibility
     const viewportSmallestDim = Math.min(viewportRect.width, viewportRect.height);
-    const minZoomFloor = Math.max(0.7, Math.min(1.0, viewportSmallestDim / 600));
+    const minZoomFloor = Math.max(0.15, Math.min(1.0, viewportSmallestDim / 800));
 
     // Smart Magnification: for very small devices (e.g. 100x100), allow zooming in up to 4x 
     // to ensure the artboard is actually usable in the preview.
