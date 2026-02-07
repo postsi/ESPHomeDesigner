@@ -245,10 +245,6 @@ export class App {
         const menuBtn = document.getElementById('simulatorMenuBtn');
         if (!runBtn || !menuBtn) return;
         
-        // Track simulator state
-        let isRunning = false;
-        let currentProcessId = null;
-        
         // Only show simulator buttons when using ESPHome adapter with LVGL
         const updateSimulatorVisibility = () => {
             const settings = AppState.settings || {};
@@ -265,20 +261,6 @@ export class App {
             }
         };
         
-        // Update button appearance based on running state
-        const updateButtonState = (running) => {
-            isRunning = running;
-            if (running) {
-                runBtn.innerHTML = '<span class="mdi mdi-stop" style="font-size: 14px; margin-right: 4px;"></span>Stop';
-                runBtn.style.background = '#f44336';
-                runBtn.title = 'Stop Simulator';
-            } else {
-                runBtn.innerHTML = '<span class="mdi mdi-play" style="font-size: 14px; margin-right: 4px;"></span>Run';
-                runBtn.style.background = '#4CAF50';
-                runBtn.title = 'Run in LVGL Simulator';
-            }
-        };
-        
         // Initial visibility check
         updateSimulatorVisibility();
         
@@ -287,48 +269,20 @@ export class App {
         
         // Import simulator module dynamically
         const { 
-            startSimulator,
-            stopSimulator,
-            getSimulatorStatus,
             downloadSimulatorYaml, 
             copySimulatorYaml,
             showSimulatorInstructions 
         } = await import('./io/simulator.js');
         
-        // Main Run/Stop button click handler
+        // Main Run button click handler - downloads YAML for local execution
         runBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             
-            if (isRunning) {
-                // Stop the simulator
-                runBtn.disabled = true;
-                runBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin" style="font-size: 14px; margin-right: 4px;"></span>Stopping...';
-                
-                const result = await stopSimulator();
-                if (result.success) {
-                    showToast('Simulator stopped', 'success');
-                    currentProcessId = null;
-                    updateButtonState(false);
-                } else {
-                    showToast(`Failed to stop: ${result.error}`, 'error');
-                }
-                runBtn.disabled = false;
-            } else {
-                // Start the simulator
-                runBtn.disabled = true;
-                runBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin" style="font-size: 14px; margin-right: 4px;"></span>Starting...';
-                
-                const result = await startSimulator();
-                if (result.success) {
-                    showToast('Simulator started - window should open shortly', 'success');
-                    currentProcessId = result.process_id;
-                    updateButtonState(true);
-                } else {
-                    showToast(`Failed to start: ${result.error}`, 'error');
-                    updateButtonState(false);
-                }
-                runBtn.disabled = false;
-            }
+            // Download the simulator YAML
+            downloadSimulatorYaml();
+            
+            // Show instructions
+            showToast('YAML downloaded! Run: esphome run ~/Downloads/lvgl-simulator.yaml', 'success', 8000);
         });
         
         // Menu button click handler - show options dropdown
@@ -408,17 +362,6 @@ export class App {
                 }
             };
             setTimeout(() => document.addEventListener('click', closeMenu), 0);
-        });
-        
-        // Listen for simulator status changes
-        window.on('simulator-status-changed', (detail) => {
-            if (detail.status === 'running') {
-                updateButtonState(true);
-                currentProcessId = detail.process_id;
-            } else if (detail.status === 'idle' || detail.status === 'error') {
-                updateButtonState(false);
-                currentProcessId = null;
-            }
         });
     }
     
