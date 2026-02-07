@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 from aiohttp import web
 from homeassistant.core import HomeAssistant
@@ -25,7 +25,7 @@ from .base import DesignerBaseView
 _LOGGER = logging.getLogger(__name__)
 
 # Track running simulator processes
-_simulator_processes: dict[str, subprocess.Popen] = {}
+_simulator_processes: Dict[str, Any] = {}
 
 
 def _check_esphome_installed() -> tuple[bool, str]:
