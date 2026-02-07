@@ -274,15 +274,99 @@ export class App {
             showSimulatorInstructions 
         } = await import('./io/simulator.js');
         
-        // Main Run button click handler - downloads YAML for local execution
+        // Track simulator state
+        let isRunning = false;
+        
+        const updateButtonState = (running) => {
+            isRunning = running;
+            if (running) {
+                runBtn.innerHTML = '<span class="mdi mdi-stop" style="font-size: 14px; margin-right: 4px;"></span>Stop';
+                runBtn.style.background = '#f44336';
+                runBtn.title = 'Stop Simulator';
+            } else {
+                runBtn.innerHTML = '<span class="mdi mdi-play" style="font-size: 14px; margin-right: 4px;"></span>Run';
+                runBtn.style.background = '#4CAF50';
+                runBtn.title = 'Run in LVGL Simulator';
+            }
+        };
+        
+        // Check if local helper is running
+        const LOCAL_HELPER_URL = 'http://localhost:18765';
+        let helperAvailable = false;
+        
+        const checkHelper = async () => {
+            try {
+                const resp = await fetch(`${LOCAL_HELPER_URL}/ping`, { method: 'GET' });
+                if (resp.ok) {
+                    helperAvailable = true;
+                    // Also check if simulator is running
+                    const statusResp = await fetch(`${LOCAL_HELPER_URL}/status`);
+                    if (statusResp.ok) {
+                        const status = await statusResp.json();
+                        updateButtonState(status.running);
+                    }
+                }
+            } catch (e) {
+                helperAvailable = false;
+            }
+        };
+        
+        // Check helper on init and periodically
+        checkHelper();
+        setInterval(checkHelper, 5000);
+        
+        // Import generateSimulatorYaml
+        const { generateSimulatorYaml } = await import('./io/simulator.js');
+        
+        // Main Run/Stop button click handler
         runBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             
-            // Download the simulator YAML
-            downloadSimulatorYaml();
+            if (!helperAvailable) {
+                // Helper not running - show instructions
+                showToast('Start the helper first: python3 ~/esphome-simulator-helper.py', 'warning', 6000);
+                downloadSimulatorYaml();
+                return;
+            }
             
-            // Show instructions
-            showToast('YAML downloaded! Run: esphome run ~/Downloads/lvgl-simulator.yaml', 'success', 8000);
+            if (isRunning) {
+                // Stop the simulator
+                runBtn.disabled = true;
+                try {
+                    await fetch(`${LOCAL_HELPER_URL}/stop`, { method: 'POST' });
+                    showToast('Simulator stopped', 'success');
+                    updateButtonState(false);
+                } catch (e) {
+                    showToast('Failed to stop simulator', 'error');
+                }
+                runBtn.disabled = false;
+            } else {
+                // Start the simulator
+                runBtn.disabled = true;
+                runBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin" style="font-size: 14px; margin-right: 4px;"></span>Starting...';
+                
+                try {
+                    const yaml = generateSimulatorYaml();
+                    const resp = await fetch(`${LOCAL_HELPER_URL}/run`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ yaml })
+                    });
+                    
+                    const result = await resp.json();
+                    if (result.success) {
+                        showToast('Simulator starting... window will open shortly', 'success');
+                        updateButtonState(true);
+                    } else {
+                        showToast(`Failed: ${result.error}`, 'error');
+                        updateButtonState(false);
+                    }
+                } catch (e) {
+                    showToast('Failed to connect to helper', 'error');
+                    updateButtonState(false);
+                }
+                runBtn.disabled = false;
+            }
         });
         
         // Menu button click handler - show options dropdown
