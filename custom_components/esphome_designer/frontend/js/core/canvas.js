@@ -68,6 +68,10 @@ export class Canvas {
             this.applyZoom();
             this.rulers.update();
         });
+        // Re-render when HA entity states are updated (for live preview of entity-bound widgets)
+        on(EVENTS.ENTITIES_LOADED, () => {
+            this.render();
+        });
 
         // Pages Header (clickable to fit all)
         const pagesHeader = document.getElementById('pagesHeader');

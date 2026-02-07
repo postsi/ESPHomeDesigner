@@ -41,7 +41,12 @@ export default defineConfig({
         // Proxy API requests to Home Assistant - bypasses CORS for development
         proxy: {
             '/api/esphome_designer': {
-                target: 'http://haos-sandbox.local:8124',
+                target: 'http://grimwoodha:8123',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/api': {
+                target: 'http://grimwoodha:8123',
                 changeOrigin: true,
                 secure: false,
             }

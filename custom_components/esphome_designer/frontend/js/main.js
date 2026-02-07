@@ -15,7 +15,7 @@ import { Logger } from './utils/logger.js';
 
 // Newly modularized imports
 import { showToast } from './utils/dom.js';
-import { loadLayoutFromBackend, saveLayoutToBackend, fetchEntityStates } from './io/ha_api.js';
+import { loadLayoutFromBackend, saveLayoutToBackend, fetchEntityStates, startEntityPolling } from './io/ha_api.js';
 import { loadExternalProfiles } from './io/devices.js';
 import { saveLayoutToFile, handleFileSelect } from './io/file_ops.js';
 
@@ -25,8 +25,10 @@ import { AIService } from './io/ai_service.js';
 window.aiService = new AIService();
 
 import { renderWidgetPalette } from './ui/widget_palette.js';
+import { renderControlPalette } from './ui/control_palette.js';
 import { QuickSearch } from './ui/quick_search.js';
 import { HierarchyView } from './ui/hierarchy_view.js';
+import { registry as PluginRegistry } from './core/plugin_registry.js';
 
 export class App {
     constructor() {
@@ -83,6 +85,12 @@ export class App {
 
         // Initialize UI components
         await renderWidgetPalette('widgetPalette');
+        await renderControlPalette('controlPalette');
+        this.initPaletteTabs();
+        
+        // Load control bindings plugin for HA entity binding support
+        await PluginRegistry.load('control_bindings');
+        
         this.sidebar.init();
         this.propertiesPanel.init();
         this.hierarchyView.init();
@@ -126,6 +134,7 @@ export class App {
                 await loadExternalProfiles(); // Load dynamic hardware templates FIRST
                 await loadLayoutFromBackend(); // Then load layout that might use them
                 await fetchEntityStates();
+                startEntityPolling(); // Start periodic updates for live preview
             } else {
                 Logger.log("Running in standalone/offline mode.");
                 this.loadFromLocalStorage();
@@ -226,6 +235,263 @@ export class App {
                 }
             });
         }
+        
+        // Simulator Button
+        this.initSimulatorButton();
+    }
+    
+    async initSimulatorButton() {
+        const runBtn = document.getElementById('simulatorRunBtn');
+        const menuBtn = document.getElementById('simulatorMenuBtn');
+        if (!runBtn || !menuBtn) return;
+        
+        // Track simulator state
+        let isRunning = false;
+        let currentProcessId = null;
+        
+        // Only show simulator buttons when using ESPHome adapter with LVGL
+        const updateSimulatorVisibility = () => {
+            const settings = AppState.settings || {};
+            const renderMode = settings.render_mode || 'esphome';
+            const useLvgl = settings.use_lvgl !== false;
+            
+            // Show buttons only for ESPHome mode with LVGL
+            if (renderMode === 'esphome' && useLvgl) {
+                runBtn.style.display = '';
+                menuBtn.style.display = '';
+            } else {
+                runBtn.style.display = 'none';
+                menuBtn.style.display = 'none';
+            }
+        };
+        
+        // Update button appearance based on running state
+        const updateButtonState = (running) => {
+            isRunning = running;
+            if (running) {
+                runBtn.innerHTML = '<span class="mdi mdi-stop" style="font-size: 14px; margin-right: 4px;"></span>Stop';
+                runBtn.style.background = '#f44336';
+                runBtn.title = 'Stop Simulator';
+            } else {
+                runBtn.innerHTML = '<span class="mdi mdi-play" style="font-size: 14px; margin-right: 4px;"></span>Run';
+                runBtn.style.background = '#4CAF50';
+                runBtn.title = 'Run in LVGL Simulator';
+            }
+        };
+        
+        // Initial visibility check
+        updateSimulatorVisibility();
+        
+        // Listen for settings changes
+        window.on('settings-changed', updateSimulatorVisibility);
+        
+        // Import simulator module dynamically
+        const { 
+            startSimulator,
+            stopSimulator,
+            getSimulatorStatus,
+            downloadSimulatorYaml, 
+            copySimulatorYaml,
+            showSimulatorInstructions 
+        } = await import('./io/simulator.js');
+        
+        // Main Run/Stop button click handler
+        runBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            if (isRunning) {
+                // Stop the simulator
+                runBtn.disabled = true;
+                runBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin" style="font-size: 14px; margin-right: 4px;"></span>Stopping...';
+                
+                const result = await stopSimulator();
+                if (result.success) {
+                    showToast('Simulator stopped', 'success');
+                    currentProcessId = null;
+                    updateButtonState(false);
+                } else {
+                    showToast(`Failed to stop: ${result.error}`, 'error');
+                }
+                runBtn.disabled = false;
+            } else {
+                // Start the simulator
+                runBtn.disabled = true;
+                runBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin" style="font-size: 14px; margin-right: 4px;"></span>Starting...';
+                
+                const result = await startSimulator();
+                if (result.success) {
+                    showToast('Simulator started - window should open shortly', 'success');
+                    currentProcessId = result.process_id;
+                    updateButtonState(true);
+                } else {
+                    showToast(`Failed to start: ${result.error}`, 'error');
+                    updateButtonState(false);
+                }
+                runBtn.disabled = false;
+            }
+        });
+        
+        // Menu button click handler - show options dropdown
+        menuBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            // Create dropdown menu
+            const existingMenu = document.querySelector('.simulator-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+                return;
+            }
+            
+            const menu = document.createElement('div');
+            menu.className = 'simulator-menu';
+            menu.style.cssText = `
+                position: absolute;
+                top: 100%;
+                right: 0;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-subtle);
+                border-radius: 6px;
+                padding: 4px 0;
+                min-width: 200px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 1000;
+            `;
+            
+            const menuItems = [
+                { icon: 'mdi-download', label: 'Download Simulator YAML', action: downloadSimulatorYaml },
+                { icon: 'mdi-content-copy', label: 'Copy Simulator YAML', action: async () => {
+                    const success = await copySimulatorYaml();
+                    showToast(success ? 'Copied to clipboard' : 'Failed to copy', success ? 'success' : 'error');
+                }},
+                { icon: 'mdi-help-circle-outline', label: 'Show Instructions', action: () => {
+                    const instructions = showSimulatorInstructions();
+                    this.showSimulatorInstructionsModal(instructions);
+                }}
+            ];
+            
+            menuItems.forEach(item => {
+                const menuItem = document.createElement('div');
+                menuItem.style.cssText = `
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 12px;
+                    color: var(--text-primary);
+                `;
+                menuItem.innerHTML = `<span class="mdi ${item.icon}" style="font-size: 16px;"></span>${item.label}`;
+                menuItem.addEventListener('mouseenter', () => {
+                    menuItem.style.background = 'var(--bg-hover)';
+                });
+                menuItem.addEventListener('mouseleave', () => {
+                    menuItem.style.background = '';
+                });
+                menuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu.remove();
+                    item.action();
+                });
+                menu.appendChild(menuItem);
+            });
+            
+            // Position menu relative to button
+            const wrapper = menuBtn.parentElement;
+            wrapper.style.position = 'relative';
+            wrapper.appendChild(menu);
+            
+            // Close menu when clicking outside
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target) && e.target !== menuBtn) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        });
+        
+        // Listen for simulator status changes
+        window.on('simulator-status-changed', (detail) => {
+            if (detail.status === 'running') {
+                updateButtonState(true);
+                currentProcessId = detail.process_id;
+            } else if (detail.status === 'idle' || detail.status === 'error') {
+                updateButtonState(false);
+                currentProcessId = null;
+            }
+        });
+    }
+    
+    showSimulatorInstructionsModal(instructions) {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: var(--bg-primary);
+            border-radius: 12px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow: auto;
+            padding: 24px;
+            position: relative;
+        `;
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+        `;
+        closeBtn.addEventListener('click', () => overlay.remove());
+        
+        const content = document.createElement('pre');
+        content.style.cssText = `
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: var(--text-primary);
+            margin: 0;
+        `;
+        content.textContent = instructions;
+        
+        modal.appendChild(closeBtn);
+        modal.appendChild(content);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Close on escape
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                overlay.remove();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
     }
 
     loadFromLocalStorage() {
@@ -240,6 +506,36 @@ export class App {
         } catch (e) {
             Logger.error("[App] Error loading from local storage:", e);
         }
+    }
+
+    initPaletteTabs() {
+        const tabs = document.querySelectorAll('.palette-tab');
+        const widgetPalette = document.getElementById('widgetPalette');
+        const controlPalette = document.getElementById('controlPalette');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Show/hide palettes
+                const targetTab = tab.dataset.tab;
+                if (targetTab === 'widgets') {
+                    widgetPalette.classList.add('active');
+                    widgetPalette.style.display = '';
+                    controlPalette.classList.remove('active');
+                    controlPalette.style.display = 'none';
+                } else if (targetTab === 'controls') {
+                    widgetPalette.classList.remove('active');
+                    widgetPalette.style.display = 'none';
+                    controlPalette.classList.add('active');
+                    controlPalette.style.display = '';
+                }
+            });
+        });
+
+        Logger.log("[App] Palette tabs initialized");
     }
 
     setupAutoSave() {

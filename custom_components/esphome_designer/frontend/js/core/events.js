@@ -14,7 +14,11 @@ export const EVENTS = {
     SETTINGS_CHANGED: 'settings-changed', // Device/Editor settings changed
     LAYOUT_IMPORTED: 'layout-imported',   // New layout loaded
     ENTITIES_LOADED: 'entities-loaded',   // HA entities fetched
-    ZOOM_CHANGED: 'zoom-changed'          // Canvas zoom level changed
+    ZOOM_CHANGED: 'zoom-changed',         // Canvas zoom level changed
+    CONTROL_ADDED: 'control-added',       // Control instance added to canvas
+    CONTROL_UPDATED: 'control-updated',   // Control instance updated
+    CONTROL_DELETED: 'control-deleted',   // Control instance deleted
+    SIMULATOR_STATUS_CHANGED: 'simulator-status-changed' // Simulator state changed
 };
 
 /**

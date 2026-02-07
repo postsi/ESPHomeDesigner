@@ -26,6 +26,12 @@ from .api.import_export import (
 from .api.base import DesignerBaseView
 from .api.hardware import ReTerminalHardwareListView, ReTerminalHardwareUploadView
 from .api.history import HistoryProxyView
+from .api.simulator import (
+    SimulatorCheckView,
+    SimulatorStartView,
+    SimulatorStopView,
+    SimulatorStatusView
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +58,12 @@ async def async_register_http_views(hass: HomeAssistant, storage: DashboardStora
         # Hardware Profiles
         ReTerminalHardwareListView(hass),
         ReTerminalHardwareUploadView(hass),
+        
+        # Simulator
+        SimulatorCheckView(hass),
+        SimulatorStartView(hass),
+        SimulatorStopView(hass),
+        SimulatorStatusView(hass),
     ]
 
     for view in views:

@@ -23,7 +23,8 @@ export const SUPPORTED_DEVICE_IDS = [
   'm5stack_coreink',
   'trmnl',
   'waveshare_esp32_s3_touch_lcd_7',
-  'waveshare_esp32_s3_touch_lcd_4_3'
+  'waveshare_esp32_s3_touch_lcd_4_3',
+  'jc1060p470_esp32p4'
 ];
 
 export const DEVICE_PROFILES = {
@@ -236,6 +237,40 @@ export const DEVICE_PROFILES = {
       platform: "gt911",
       transformed: true,
       transform: { swap_xy: true }
+    }
+  },
+
+  // ========================================================================
+  // ESP32-P4 DEVICES
+  // ========================================================================
+  jc1060p470_esp32p4: {
+    name: "JC1060P470 7\" 1024x600 (ESP32-P4)",
+    displayType: "color",
+    isPackageBased: true,
+    hardwarePackage: "hardware/jc1060p470-esp32p4.yaml",
+    chip: "esp32p4",
+    variant: "esp32p4",
+    displayModel: "JC1060P470",
+    displayPlatform: "mipi_dsi",
+    resolution: { width: 1024, height: 600 },
+    shape: "rect",
+    features: {
+      psram: true,
+      buzzer: false,
+      buttons: false,
+      lcd: true,
+      lvgl: true,
+      touch: true,
+      mipi_dsi: true,
+      esp32_hosted: true,  // Uses ESP32-C6 as WiFi co-processor
+      backlight: true
+    },
+    touch: {
+      platform: "gt911",
+      i2c_id: "bus_a",
+      interrupt_pin: "GPIO21",
+      reset_pin: "GPIO22",
+      transform: { swap_xy: false, mirror_x: false, mirror_y: false }
     }
   },
 

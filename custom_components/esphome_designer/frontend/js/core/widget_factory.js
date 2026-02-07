@@ -123,37 +123,40 @@ export class WidgetFactory {
 
         // Try to get defaults from PluginRegistry
         const plugin = PluginRegistry.get(type);
-        if (plugin && plugin.defaults) {
-            widget.props = { ...plugin.defaults };
+        if (plugin) {
+            // Apply props defaults if available
+            if (plugin.defaults) {
+                widget.props = { ...plugin.defaults };
 
-            // Adjust colors based on dark mode if they were defaults
-            if (widget.props.color === "black" || widget.props.color === "white") {
-                widget.props.color = "theme_auto";
-            }
-            if (widget.props.text_color === "black" || widget.props.text_color === "white") {
-                widget.props.text_color = "theme_auto";
-            }
-            if (widget.props.bg_color === "black" || widget.props.bg_color === "white") {
-                widget.props.bg_color = defaultBgColor;
-            }
-            // Also adjust background_color (used by weather/calendar)
-            if (widget.props.background_color === "black" || widget.props.background_color === "white") {
-                widget.props.background_color = defaultBgColor;
-            }
-            // Also adjust border_color (used by shapes)
-            if (widget.props.border_color === "black" || widget.props.border_color === "white") {
-                widget.props.border_color = defaultColor;
+                // Adjust colors based on dark mode if they were defaults
+                if (widget.props.color === "black" || widget.props.color === "white") {
+                    widget.props.color = "theme_auto";
+                }
+                if (widget.props.text_color === "black" || widget.props.text_color === "white") {
+                    widget.props.text_color = "theme_auto";
+                }
+                if (widget.props.bg_color === "black" || widget.props.bg_color === "white") {
+                    widget.props.bg_color = defaultBgColor;
+                }
+                // Also adjust background_color (used by weather/calendar)
+                if (widget.props.background_color === "black" || widget.props.background_color === "white") {
+                    widget.props.background_color = defaultBgColor;
+                }
+                // Also adjust border_color (used by shapes)
+                if (widget.props.border_color === "black" || widget.props.border_color === "white") {
+                    widget.props.border_color = defaultColor;
+                }
+
+                // Check plugin.defaults for width/height
+                if (plugin.defaults.width) widget.width = plugin.defaults.width;
+                if (plugin.defaults.height) widget.height = plugin.defaults.height;
+                if (plugin.defaults.w) widget.width = plugin.defaults.w;
+                if (plugin.defaults.h) widget.height = plugin.defaults.h;
             }
 
-            // Some plugins have specific size defaults in the plugin object
+            // Plugin-level width/height take priority
             if (plugin.width) widget.width = plugin.width;
             if (plugin.height) widget.height = plugin.height;
-
-            // NEW: Also check plugin.defaults for width/height as some plugins define them there
-            if (plugin.defaults.width) widget.width = plugin.defaults.width;
-            if (plugin.defaults.height) widget.height = plugin.defaults.height;
-            if (plugin.defaults.w) widget.width = plugin.defaults.w;
-            if (plugin.defaults.h) widget.height = plugin.defaults.h;
 
             return widget;
         }

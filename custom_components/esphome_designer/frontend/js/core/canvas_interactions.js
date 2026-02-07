@@ -7,6 +7,35 @@ import { snapToGridCell, applySnapToPosition, clearSnapGuides, updateWidgetGridC
 import { render, applyZoom, updateWidgetDOM, focusPage } from './canvas_renderer.js';
 import { highlightWidgetInSnippet } from '../io/yaml_export.js';
 import { getColorStyle } from '../utils/device.js'; // Import authentic color helper
+import { handleControlDrop } from '../ui/control_palette.js';
+
+/**
+ * Calculate bounding box for a group of control widgets
+ * @param {Object[]} widgets - Array of widget objects
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getControlBounds(widgets) {
+    if (!widgets || widgets.length === 0) {
+        return { x: 0, y: 0, width: 100, height: 100 };
+    }
+    
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const w of widgets) {
+        minX = Math.min(minX, w.x);
+        minY = Math.min(minY, w.y);
+        maxX = Math.max(maxX, w.x + w.width);
+        maxY = Math.max(maxY, w.y + w.height);
+    }
+    
+    return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
+    };
+}
 
 // Helper for manual double-click detection
 let lastClickTime = 0;
@@ -415,38 +444,83 @@ export function setupInteractions(canvasInstance) {
             // This ensures clicking/dragging any child moves the entire group
             let effectiveWidget = widget;
             let effectiveWidgetId = widgetId;
+            let isControlWidget = false;
+            let controlSiblings = [];
+            
             if (widget.parentId) {
                 const parentWidget = AppState.getWidgetById(widget.parentId);
                 if (parentWidget) {
+                    // This is a traditional group - redirect to parent
                     effectiveWidget = parentWidget;
                     effectiveWidgetId = parentWidget.id;
                     // Select the group instead of the child
                     AppState.selectWidget(effectiveWidgetId, isMulti);
+                } else {
+                    // Parent doesn't exist as a widget - this is a control widget
+                    // Find all sibling widgets with the same parentId (control instance)
+                    isControlWidget = true;
+                    const page = AppState.getCurrentPage();
+                    if (page && page.widgets) {
+                        controlSiblings = page.widgets.filter(w => w.parentId === widget.parentId);
+                        // Select all control siblings
+                        const siblingIds = controlSiblings.map(w => w.id);
+                        Logger.log("[Canvas] Control widget clicked, selecting siblings:", siblingIds.length, "widgets");
+                        AppState.selectWidgets(siblingIds);
+                    }
                 }
             }
 
             const isResizeHandle = ev.target.classList.contains("widget-resize-handle");
 
             if (isResizeHandle) {
-                // Block resizing for widgets that are part of a group
-                if (widget.parentId) {
+                // Block resizing for widgets that are part of a traditional group (not controls)
+                if (widget.parentId && !isControlWidget) {
                     return;
                 }
                 if (effectiveWidget.locked) return;
-                canvasInstance.dragState = {
-                    mode: "resize",
-                    handle: ev.target.dataset.handle || 'br',
-                    id: effectiveWidgetId,
-                    startX: ev.clientX,
-                    startY: ev.clientY,
-                    startW: effectiveWidget.width,
-                    startH: effectiveWidget.height,
-                    startWidgetX: effectiveWidget.x,
-                    startWidgetY: effectiveWidget.y,
-                    artboardEl: currentArtboardEl,
-                    dragStartPanX: canvasInstance.panX,
-                    dragStartPanY: canvasInstance.panY
-                };
+                
+                if (isControlWidget && controlSiblings.length > 0) {
+                    // Control widget resize - calculate bounding box of all siblings
+                    const bounds = getControlBounds(controlSiblings);
+                    canvasInstance.dragState = {
+                        mode: "resize-control",
+                        handle: ev.target.dataset.handle || 'br',
+                        controlId: widget.parentId,
+                        widgets: controlSiblings.map(w => ({
+                            id: w.id,
+                            startX: w.x,
+                            startY: w.y,
+                            startW: w.width,
+                            startH: w.height,
+                            // Store relative position within control bounds
+                            relX: (w.x - bounds.x) / bounds.width,
+                            relY: (w.y - bounds.y) / bounds.height,
+                            relW: w.width / bounds.width,
+                            relH: w.height / bounds.height
+                        })),
+                        startX: ev.clientX,
+                        startY: ev.clientY,
+                        startBounds: bounds,
+                        artboardEl: currentArtboardEl,
+                        dragStartPanX: canvasInstance.panX,
+                        dragStartPanY: canvasInstance.panY
+                    };
+                } else {
+                    canvasInstance.dragState = {
+                        mode: "resize",
+                        handle: ev.target.dataset.handle || 'br',
+                        id: effectiveWidgetId,
+                        startX: ev.clientX,
+                        startY: ev.clientY,
+                        startW: effectiveWidget.width,
+                        startH: effectiveWidget.height,
+                        startWidgetX: effectiveWidget.x,
+                        startWidgetY: effectiveWidget.y,
+                        artboardEl: currentArtboardEl,
+                        dragStartPanX: canvasInstance.panX,
+                        dragStartPanY: canvasInstance.panY
+                    };
+                }
             } else {
                 if (effectiveWidget.locked) return;
 
@@ -771,6 +845,71 @@ export function onMouseMove(ev, canvasInstance) {
                     x: widget.x, y: widget.y, w: widget.width, h: widget.height
                 });
             }
+        } else if (canvasInstance.dragState.mode === "resize-control") {
+            // Resize all widgets in a control proportionally
+            const ds = canvasInstance.dragState;
+            const handle = ds.handle;
+            const panDx = (ds.dragStartPanX - canvasInstance.panX) / zoom;
+            const panDy = (ds.dragStartPanY - canvasInstance.panY) / zoom;
+            const dx = (ev.clientX - ds.startX) / zoom + panDx;
+            const dy = (ev.clientY - ds.startY) / zoom + panDy;
+
+            // Calculate new control bounds based on handle
+            let newBoundsX = ds.startBounds.x;
+            let newBoundsY = ds.startBounds.y;
+            let newBoundsW = ds.startBounds.width;
+            let newBoundsH = ds.startBounds.height;
+
+            // Horizontal resize
+            if (handle.includes('l')) {
+                newBoundsW = ds.startBounds.width - dx;
+                newBoundsX = ds.startBounds.x + dx;
+            } else if (handle.includes('r')) {
+                newBoundsW = ds.startBounds.width + dx;
+            }
+
+            // Vertical resize
+            if (handle.includes('t')) {
+                newBoundsH = ds.startBounds.height - dy;
+                newBoundsY = ds.startBounds.y + dy;
+            } else if (handle.includes('b')) {
+                newBoundsH = ds.startBounds.height + dy;
+            }
+
+            // Minimum control size
+            const minControlSize = 40;
+            if (newBoundsW < minControlSize) {
+                if (handle.includes('l')) newBoundsX = ds.startBounds.x + ds.startBounds.width - minControlSize;
+                newBoundsW = minControlSize;
+            }
+            if (newBoundsH < minControlSize) {
+                if (handle.includes('t')) newBoundsY = ds.startBounds.y + ds.startBounds.height - minControlSize;
+                newBoundsH = minControlSize;
+            }
+
+            // Clamp to canvas bounds
+            newBoundsX = Math.max(0, Math.min(dims.width - newBoundsW, newBoundsX));
+            newBoundsY = Math.max(0, Math.min(dims.height - newBoundsH, newBoundsY));
+
+            // Update all widgets proportionally
+            for (const wInfo of ds.widgets) {
+                const w = AppState.getWidgetById(wInfo.id);
+                if (!w) continue;
+
+                // Calculate new position and size based on relative position within control
+                w.x = Math.round(newBoundsX + wInfo.relX * newBoundsW);
+                w.y = Math.round(newBoundsY + wInfo.relY * newBoundsH);
+                w.width = Math.max(10, Math.round(wInfo.relW * newBoundsW));
+                w.height = Math.max(10, Math.round(wInfo.relH * newBoundsH));
+
+                updateWidgetDOM(canvasInstance, w);
+            }
+
+            if (canvasInstance.rulers && ds.widgets.length > 0) {
+                canvasInstance.rulers.setIndicators({
+                    x: newBoundsX, y: newBoundsY, w: newBoundsW, h: newBoundsH
+                });
+            }
         } else if (canvasInstance.dragState.mode === "reorder-page") {
             // Update ghost
             updatePageDragGhost(canvasInstance, ev.clientX, ev.clientY);
@@ -966,6 +1105,9 @@ export function onMouseUp(ev, canvasInstance) {
                     return;
                 }
             }
+        } else if (dragMode === "resize-control") {
+            // Control resize complete - record history and emit change
+            Logger.log("[Canvas] Control resize complete");
         } else if (dragMode === "reorder-page") {
             const sourceIndex = canvasInstance.dragState.pageIndex;
             const targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -1356,6 +1498,14 @@ export function setupDragAndDrop(canvasInstance) {
         document.querySelectorAll(".artboard-wrapper.drag-over, .add-page-placeholder.drag-over").forEach(el => {
             el.classList.remove("drag-over");
         });
+
+        // Check for control drop first
+        const controlId = e.dataTransfer.getData("application/control-id");
+        if (controlId) {
+            Logger.log("[Canvas] Control drop detected:", controlId);
+            handleControlDrop(controlId, e, canvasInstance);
+            return;
+        }
 
         // 1. Capture type and coordinates SYNCHRONOUSLY
         const type = e.dataTransfer.getData("application/widget-type") || e.dataTransfer.getData("text/plain");

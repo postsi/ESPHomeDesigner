@@ -1704,6 +1704,196 @@ export class PropertiesPanel {
             this.endSection();
         }
 
+        else if (type === "ha_thermostat") {
+            // Home Assistant Thermostat Widget
+            this.createSection("Climate Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a climate.* entity to show live data");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Thermostat", (v) => updateProp("title", v));
+            this.addColorMixer("Accent Color", props.accent_color || "#ff5722", (v) => updateProp("accent_color", v));
+            this.addColorMixer("Background", props.bg_color || "#1a1a2e", (v) => updateProp("bg_color", v));
+            this.addColorMixer("Text Color", props.text_color || "#ffffff", (v) => updateProp("text_color", v));
+            this.endSection();
+
+            this.createSection("Temperature Range", false);
+            this.addLabeledInput("Min Temp", "number", props.min_temp || 7, (v) => updateProp("min_temp", parseFloat(v)));
+            this.addLabeledInput("Max Temp", "number", props.max_temp || 35, (v) => updateProp("max_temp", parseFloat(v)));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addHint("These values are used when no entity is connected");
+            this.addLabeledInput("Current Temp", "number", props.current_temp || 21, (v) => updateProp("current_temp", parseFloat(v)));
+            this.addLabeledInput("Target Temp", "number", props.target_temp || 22, (v) => updateProp("target_temp", parseFloat(v)));
+            this.addSelect("HVAC Mode", props.hvac_mode || "heat", ["off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only"], (v) => updateProp("hvac_mode", v));
+            this.endSection();
+        }
+
+        else if (type === "ha_light") {
+            // Home Assistant Light Widget
+            this.createSection("Light Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a light.* entity to show live data");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Light", (v) => updateProp("title", v));
+            this.addColorMixer("On Color", props.on_color || "#ffc107", (v) => updateProp("on_color", v));
+            this.addColorMixer("Off Color", props.off_color || "#424242", (v) => updateProp("off_color", v));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addCheckbox("Is On", props.is_on || false, (v) => updateProp("is_on", v));
+            this.addLabeledInput("Brightness %", "number", props.brightness || 100, (v) => updateProp("brightness", parseInt(v, 10)));
+            this.endSection();
+        }
+
+        else if (type === "ha_switch") {
+            // Home Assistant Switch Widget
+            this.createSection("Switch Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a switch.* or input_boolean.* entity");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Switch", (v) => updateProp("title", v));
+            this.addColorMixer("On Color", props.on_color || "#4caf50", (v) => updateProp("on_color", v));
+            this.addColorMixer("Off Color", props.off_color || "#9e9e9e", (v) => updateProp("off_color", v));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addCheckbox("Is On", props.is_on || false, (v) => updateProp("is_on", v));
+            this.endSection();
+        }
+
+        else if (type === "ha_cover") {
+            // Home Assistant Cover Widget
+            this.createSection("Cover Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a cover.* entity");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Cover", (v) => updateProp("title", v));
+            this.addColorMixer("Accent Color", props.accent_color || "#2196f3", (v) => updateProp("accent_color", v));
+            this.addSelect("Device Class", props.device_class || "blind", ["blind", "curtain", "door", "garage", "gate", "shade", "shutter", "window"], (v) => updateProp("device_class", v));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addLabeledInput("Position %", "number", props.position || 0, (v) => updateProp("position", parseInt(v, 10)));
+            this.endSection();
+        }
+
+        else if (type === "ha_fan") {
+            // Home Assistant Fan Widget
+            this.createSection("Fan Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a fan.* entity");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Fan", (v) => updateProp("title", v));
+            this.addColorMixer("On Color", props.on_color || "#4caf50", (v) => updateProp("on_color", v));
+            this.addColorMixer("Off Color", props.off_color || "#424242", (v) => updateProp("off_color", v));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addCheckbox("Is On", props.is_on || false, (v) => updateProp("is_on", v));
+            this.addLabeledInput("Speed %", "number", props.percentage || 0, (v) => updateProp("percentage", parseInt(v, 10)));
+            this.endSection();
+        }
+
+        else if (type === "ha_media_player") {
+            // Home Assistant Media Player Widget
+            this.createSection("Media Player Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a media_player.* entity");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Media Player", (v) => updateProp("title", v));
+            this.addColorMixer("Accent Color", props.accent_color || "#1db954", (v) => updateProp("accent_color", v));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addLabeledInput("Media Title", "text", props.media_title || "", (v) => updateProp("media_title", v));
+            this.addLabeledInput("Media Artist", "text", props.media_artist || "", (v) => updateProp("media_artist", v));
+            this.addLabeledInput("Volume (0-1)", "number", props.volume || 0.5, (v) => updateProp("volume", parseFloat(v)));
+            this.endSection();
+        }
+
+        else if (type === "ha_sensor") {
+            // Home Assistant Sensor Widget
+            this.createSection("Sensor Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a sensor.* or binary_sensor.* entity");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Sensor", (v) => updateProp("title", v));
+            this.addLabeledInput("Unit", "text", props.unit || "", (v) => updateProp("unit", v));
+            this.addLabeledInput("Decimals", "number", props.decimals || 1, (v) => updateProp("decimals", parseInt(v, 10)));
+            this.addColorMixer("Accent Color", props.accent_color || "#2196f3", (v) => updateProp("accent_color", v));
+            this.addSelect("Device Class", props.device_class || "default", ["default", "temperature", "humidity", "pressure", "illuminance", "battery", "power", "energy", "voltage", "current", "gas", "co2", "motion", "door", "window", "occupancy"], (v) => updateProp("device_class", v));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addLabeledInput("Value", "text", props.value || "--", (v) => updateProp("value", v));
+            this.endSection();
+        }
+
+        else if (type === "ha_lock") {
+            // Home Assistant Lock Widget
+            this.createSection("Lock Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a lock.* entity");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Lock", (v) => updateProp("title", v));
+            this.addColorMixer("Locked Color", props.locked_color || "#4caf50", (v) => updateProp("locked_color", v));
+            this.addColorMixer("Unlocked Color", props.unlocked_color || "#f44336", (v) => updateProp("unlocked_color", v));
+            this.endSection();
+
+            this.createSection("Preview Values", false);
+            this.addCheckbox("Is Locked", props.is_locked !== false, (v) => updateProp("is_locked", v));
+            this.endSection();
+        }
+
+        else if (type === "ha_button") {
+            // Home Assistant Button Widget
+            this.createSection("Button Entity", true);
+            this.addLabeledInputWithPicker("Entity ID", "text", widget.entity_id || "", (v) => {
+                AppState.updateWidget(widget.id, { entity_id: v });
+            }, widget);
+            this.addHint("Select a scene.*, script.*, or button.* entity");
+            this.endSection();
+
+            this.createSection("Appearance", true);
+            this.addLabeledInput("Title", "text", props.title || "Button", (v) => updateProp("title", v));
+            this.addColorMixer("Button Color", props.button_color || "#6200ea", (v) => updateProp("button_color", v));
+            this.addColorMixer("Running Color", props.running_color || "#4caf50", (v) => updateProp("running_color", v));
+            this.endSection();
+        }
+
         else if (type === "lvgl_label" || type.startsWith("lvgl_")) {
             // Apply common LVGL properties to all lvgl_* widgets
             this.addCommonLVGLProperties(widget, props);

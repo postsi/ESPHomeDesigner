@@ -4,6 +4,7 @@ import { DEVICE_PROFILES } from '../../io/devices.js';
 import { Logger } from '../../utils/logger.js';
 import { hasHaBackend } from '../../utils/env.js';
 import { generateId, deepClone } from '../../utils/helpers.js';
+import { SCHEMA_VERSION } from '../../types.js';
 
 export class ProjectStore {
     constructor() {
@@ -14,6 +15,7 @@ export class ProjectStore {
          *  deviceName: string,
          *  deviceModel: string,
          *  currentLayoutId: string,
+         *  controls: import("../../types.js").ControlDefinition[],
          *  widgetsById: Map<string, import("../../types.js").WidgetConfig>
          * }}
          */
@@ -29,6 +31,7 @@ export class ProjectStore {
                 height: 300,
                 colorMode: 'bw'
             },
+            controls: [],
             widgetsById: new Map()
         };
         this.reset();
@@ -42,6 +45,7 @@ export class ProjectStore {
             widgets: []
         }];
         this.state.currentPageIndex = 0;
+        this.state.controls = [];
         this.rebuildWidgetsIndex();
     }
 
@@ -57,6 +61,8 @@ export class ProjectStore {
     get currentLayoutId() { return this.state.currentLayoutId; }
     /** @returns {Object} */
     get protocolHardware() { return this.state.protocolHardware; }
+    /** @returns {import("../../types.js").ControlDefinition[]} */
+    get controls() { return this.state.controls || []; }
 
     /** @returns {import("../../types.js").PageConfig} */
     getCurrentPage() {
@@ -69,6 +75,14 @@ export class ProjectStore {
      */
     getWidgetById(id) {
         return this.state.widgetsById.get(id);
+    }
+
+    /**
+     * @param {string} id 
+     * @returns {import("../../types.js").ControlDefinition|undefined}
+     */
+    getControlById(id) {
+        return this.state.controls?.find(c => c.id === id);
     }
 
     rebuildWidgetsIndex() {
@@ -494,11 +508,13 @@ export class ProjectStore {
     /** @returns {import("../../types.js").ProjectPayload} */
     getPagesPayload() {
         return {
+            schemaVersion: SCHEMA_VERSION,
             pages: this.state.pages,
             deviceName: this.state.deviceName,
             deviceModel: this.state.deviceModel,
             currentLayoutId: this.state.currentLayoutId,
-            customHardware: this.state.customHardware
+            customHardware: this.state.customHardware,
+            controls: this.state.controls || []
         };
     }
 

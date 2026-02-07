@@ -24,6 +24,12 @@ export function detectHaBackendBaseUrl() {
         if (loc.protocol === "file:") {
             return null;
         }
+        
+        // Vite dev server mode - use relative URL (proxied to HA)
+        if (loc.port === "5174" || loc.port === "5173") {
+            return `/api/esphome_designer`;
+        }
+        
         if (
             loc.hostname === "homeassistant" ||
             loc.hostname === "hassio" ||

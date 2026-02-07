@@ -85,7 +85,7 @@ export async function fetchEntityStates() {
         const token = getHaToken();
 
         // First try the custom component endpoint
-        apiUrl = `${HA_API_BASE}/entities?domains=sensor,binary_sensor,weather,light,switch,fan,cover,climate,media_player,input_number,number,input_boolean,input_text,input_select,button,input_button`;
+        apiUrl = `${HA_API_BASE}/entities?domains=sensor,binary_sensor,weather,light,switch,fan,cover,climate,media_player,input_number,number,input_boolean,input_text,input_select,button,input_button,lock,scene,script,automation`;
 
         Logger.log("[EntityStates] Fetching from:", apiUrl);
 
@@ -128,7 +128,7 @@ export async function fetchEntityStates() {
             const allowedDomains = ['sensor', 'binary_sensor', 'weather', 'light', 'switch',
                 'fan', 'cover', 'climate', 'media_player', 'input_number',
                 'number', 'input_boolean', 'input_text', 'input_select',
-                'button', 'input_button'];
+                'button', 'input_button', 'lock', 'scene', 'script', 'automation'];
             entities = entities
                 .filter(e => {
                     const domain = e.entity_id?.split('.')[0];
@@ -193,6 +193,39 @@ export async function fetchEntityStates() {
         return [];
     } finally {
         entityStatesFetchInProgress = false;
+    }
+}
+
+// --- Periodic Entity State Polling ---
+let entityPollingInterval = null;
+const ENTITY_POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
+
+/**
+ * Starts periodic polling for entity state updates.
+ * This enables live preview of HA entity states in the designer.
+ */
+export function startEntityPolling() {
+    if (entityPollingInterval) return; // Already polling
+    if (!hasHaBackend()) return; // No backend to poll
+    
+    Logger.log(`[EntityPolling] Starting periodic entity state polling (every ${ENTITY_POLL_INTERVAL_MS/1000}s)`);
+    entityPollingInterval = setInterval(async () => {
+        try {
+            await fetchEntityStates();
+        } catch (err) {
+            Logger.warn("[EntityPolling] Error during poll:", err);
+        }
+    }, ENTITY_POLL_INTERVAL_MS);
+}
+
+/**
+ * Stops periodic polling for entity state updates.
+ */
+export function stopEntityPolling() {
+    if (entityPollingInterval) {
+        clearInterval(entityPollingInterval);
+        entityPollingInterval = null;
+        Logger.log("[EntityPolling] Stopped periodic entity state polling");
     }
 }
 

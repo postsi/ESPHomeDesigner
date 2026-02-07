@@ -1,6 +1,7 @@
 import { AppState } from '../core/state.js';
 import { Logger } from '../utils/logger.js';
 import { DEVICE_PROFILES } from './devices.js';
+import { migrateProject, needsMigration, detectSchemaVersion } from '../core/schema_migration.js';
 
 /**
  * Creates a custom js-yaml schema that supports ESPHome tags like !lambda.
@@ -1857,6 +1858,26 @@ export function loadLayoutIntoState(layout) {
     }
     // ---------------------------------
 
+    // --- Schema Migration ---
+    // Check if the layout needs migration to the current schema version
+    const detectedVersion = detectSchemaVersion(layout);
+    if (needsMigration(layout)) {
+        Logger.log(`[loadLayoutIntoState] Schema migration needed: v${detectedVersion} -> current`);
+        try {
+            const result = migrateProject(layout);
+            if (result.migrated) {
+                Logger.log(`[loadLayoutIntoState] Migration successful: v${result.fromVersion} -> v${result.toVersion}`);
+                layout = result.data;
+            }
+        } catch (migrationError) {
+            Logger.error(`[loadLayoutIntoState] Schema migration failed:`, migrationError);
+            // Continue with original layout - best effort
+        }
+    } else {
+        Logger.log(`[loadLayoutIntoState] Schema version: ${detectedVersion} (no migration needed)`);
+    }
+    // ---------------------------------
+
     if (!Array.isArray(layout.pages)) {
         Logger.error("Invalid layout - missing pages array");
         throw new Error("invalid_layout");
@@ -1913,6 +1934,13 @@ export function loadLayoutIntoState(layout) {
     const protocolHardware = layout.protocol_hardware || layout.protocolHardware;
     if (protocolHardware) {
         AppState.updateProtocolHardware(protocolHardware);
+    }
+
+    // Load controls (reusable composite widgets) if present
+    const controls = layout.controls;
+    if (controls && Array.isArray(controls)) {
+        Logger.log(`[loadLayoutIntoState] Loading ${controls.length} control definitions`);
+        AppState.setControls(controls);
     }
 
     // Merge imported settings with existing settings

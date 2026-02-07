@@ -292,6 +292,68 @@ class AppStateFacade {
         emit(EVENTS.PAGE_CHANGED, { index: this.currentPageIndex, forceFocus: true });
     }
 
+    // --- Controls (Reusable Composite Widgets) ---
+    /** @returns {import("../../types.js").ControlDefinition[]} */
+    get controls() { return this.project.controls; }
+
+    /**
+     * Sets the controls array (reusable composite widget definitions)
+     * @param {import("../../types.js").ControlDefinition[]} controls
+     */
+    setControls(controls) {
+        this.project.state.controls = controls || [];
+        emit(EVENTS.STATE_CHANGED);
+    }
+
+    /**
+     * Adds a new control definition
+     * @param {import("../../types.js").ControlDefinition} control
+     */
+    addControl(control) {
+        if (!this.project.state.controls) {
+            this.project.state.controls = [];
+        }
+        this.project.state.controls.push(control);
+        this.recordHistory();
+        emit(EVENTS.STATE_CHANGED);
+    }
+
+    /**
+     * Updates an existing control definition
+     * @param {string} controlId
+     * @param {Partial<import("../../types.js").ControlDefinition>} updates
+     */
+    updateControl(controlId, updates) {
+        const control = this.project.getControlById(controlId);
+        if (control) {
+            Object.assign(control, updates);
+            this.recordHistory();
+            emit(EVENTS.STATE_CHANGED);
+        }
+    }
+
+    /**
+     * Deletes a control definition
+     * @param {string} controlId
+     */
+    deleteControl(controlId) {
+        const idx = this.project.state.controls?.findIndex(c => c.id === controlId);
+        if (idx !== undefined && idx !== -1) {
+            this.project.state.controls.splice(idx, 1);
+            this.recordHistory();
+            emit(EVENTS.STATE_CHANGED);
+        }
+    }
+
+    /**
+     * Gets a control definition by ID
+     * @param {string} controlId
+     * @returns {import("../../types.js").ControlDefinition|undefined}
+     */
+    getControlById(controlId) {
+        return this.project.getControlById(controlId);
+    }
+
     addWidget(w, pageIndex = null) {
         this._checkRenderingModeForWidget(w);
         this.project.addWidget(w, pageIndex);
@@ -791,15 +853,16 @@ class AppStateFacade {
         if (mode === 'oepl') return !!plugin.exportOEPL;
         if (mode === 'opendisplay') return !!plugin.exportOpenDisplay;
         if (mode === 'lvgl') {
-            // LVGL mode: permit native LVGL widgets OR widgets with exportLVGL translation
+            // LVGL mode: permit native LVGL widgets, HA widgets, OR widgets with exportLVGL translation
             const isNativeLVGL = w.type && w.type.startsWith('lvgl_');
+            const isHaWidget = w.type && w.type.startsWith('ha_'); // HA widgets are LVGL-based
             const hasLVGLExport = typeof plugin.exportLVGL === 'function';
-            return isNativeLVGL || hasLVGLExport;
+            return isNativeLVGL || isHaWidget || hasLVGLExport;
         }
         if (mode === 'direct') {
             // Direct mode uses display.lambda. Compatible if it has 'export' method
             // AND it's not strictly for another protocol.
-            const isProtocolSpecific = w.type && (w.type.startsWith('lvgl_') || w.type.startsWith('oepl_'));
+            const isProtocolSpecific = w.type && (w.type.startsWith('lvgl_') || w.type.startsWith('oepl_') || w.type.startsWith('ha_'));
             return !!plugin.export && !isProtocolSpecific;
         }
 
@@ -816,12 +879,13 @@ class AppStateFacade {
 
         const currentMode = this.preferences.state.renderingMode || 'direct';
 
-        // Auto-detect if it's an LVGL, OEPL, or ODP widget
+        // Auto-detect if it's an LVGL, OEPL, ODP, or HA widget
         const isLvglWidget = w.type.startsWith('lvgl_');
+        const isHaWidget = w.type.startsWith('ha_'); // HA widgets require LVGL mode
         const isOEPLWidget = w.type.startsWith('oepl_');
         const isODPWidget = w.type.startsWith('odp_') || w.type.startsWith('opendisplay_');
 
-        if (isLvglWidget && currentMode === 'direct') {
+        if ((isLvglWidget || isHaWidget) && currentMode === 'direct') {
             this.updateSettings({ renderingMode: 'lvgl' });
             Logger.log(`[AppState] Auto-switched to LVGL rendering mode because an LVGL widget (${w.type}) was added.`);
             showToast("Auto-switched to LVGL rendering mode", "info");

@@ -262,6 +262,86 @@ export const WIDGET_CATEGORIES = [
         ]
     },
     {
+        id: 'ha',
+        name: 'Home Assistant',
+        expanded: true,
+        icon: '<svg class="category-svg" viewBox="0 0 24 24" width="16" height="16"><path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>',
+        widgets: [
+            {
+                type: 'ha_thermostat',
+                label: 'Thermostat',
+                tag: 'Climate',
+                defaultWidth: 160,
+                defaultHeight: 200,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><path d="M4 18 A 10 10 0 1 1 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="12" cy="12" r="3" fill="currentColor" /><text x="12" y="14" font-size="4" text-anchor="middle" fill="white">°</text></svg>'
+            },
+            {
+                type: 'ha_light',
+                label: 'Light',
+                tag: 'Light',
+                defaultWidth: 140,
+                defaultHeight: 180,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><path d="M9 21h6M12 3a6 6 0 016 6c0 3-2 5-2 8H8c0-3-2-5-2-8a6 6 0 016-6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>'
+            },
+            {
+                type: 'ha_switch',
+                label: 'Switch',
+                tag: 'Switch',
+                defaultWidth: 140,
+                defaultHeight: 60,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="16" cy="12" r="3" fill="currentColor" /></svg>'
+            },
+            {
+                type: 'ha_cover',
+                label: 'Cover',
+                tag: 'Cover',
+                defaultWidth: 160,
+                defaultHeight: 140,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1" /><line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" stroke-width="1" /></svg>'
+            },
+            {
+                type: 'ha_fan',
+                label: 'Fan',
+                tag: 'Fan',
+                defaultWidth: 140,
+                defaultHeight: 160,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" fill="currentColor" /><path d="M12 2c-2.5 0-4.5 2-4.5 4.5c0 1.5.7 2.8 1.8 3.7c-.6.8-1.3 1.8-1.3 1.8s-2.2-.5-3.7-.5C1.8 11.5 0 13.5 0 16s2 4.5 4.5 4.5c1.5 0 2.8-.7 3.7-1.8l1.8 1.3s-.5 2.2-.5 3.7c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5c0-1.5-.7-2.8-1.8-3.7l1.3-1.8s2.2.5 3.7.5c2.5 0 4.5-2 4.5-4.5s-2-4.5-4.5-4.5c-1.5 0-2.8.7-3.7 1.8l-1.8-1.3s.5-2.2.5-3.7C16.5 4 14.5 2 12 2z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>'
+            },
+            {
+                type: 'ha_media_player',
+                label: 'Media Player',
+                tag: 'Media',
+                defaultWidth: 200,
+                defaultHeight: 180,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><polygon points="10,8 16,12 10,16" fill="currentColor" /></svg>'
+            },
+            {
+                type: 'ha_sensor',
+                label: 'Sensor',
+                tag: 'Sensor',
+                defaultWidth: 120,
+                defaultHeight: 100,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" /><text x="12" y="16" font-size="10" text-anchor="middle" fill="currentColor">42</text></svg>'
+            },
+            {
+                type: 'ha_lock',
+                label: 'Lock',
+                tag: 'Lock',
+                defaultWidth: 140,
+                defaultHeight: 120,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 11V7a4 4 0 018 0v4" fill="none" stroke="currentColor" stroke-width="2" /></svg>'
+            },
+            {
+                type: 'ha_button',
+                label: 'Button',
+                tag: 'Action',
+                defaultWidth: 120,
+                defaultHeight: 80,
+                icon: '<svg class="widget-icon" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2" /><polygon points="10,9 10,15 15,12" fill="currentColor" /></svg>'
+            }
+        ]
+    },
+    {
         id: 'lvgl',
         name: 'LVGL Components',
         expanded: false,
